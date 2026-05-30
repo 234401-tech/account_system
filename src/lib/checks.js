@@ -5,6 +5,7 @@ import { rate } from "./format.js";
 //  - 비목 초과집행: 집행액 > 배정액
 //  - 참여율 초과: 개인 참여율 100% 초과
 export function runChecks(co) {
+  if (!co || !co.budget || !co.exec) return [];
   const flags = [];
   BIMOK.forEach((b) => {
     const bb = co.budget[b.key] || 0, ee = co.exec[b.key] || 0;

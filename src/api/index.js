@@ -8,7 +8,7 @@
 import * as mock from "./mock.js";
 import * as real from "./http.js";
 
-const USE_REAL = !!import.meta.env.VITE_API_BASE || import.meta.env.VITE_USE_BACKEND === "true";
+const USE_REAL = import.meta.env.PROD || !!import.meta.env.VITE_API_BASE || import.meta.env.VITE_USE_BACKEND === "true";
 
 const impl = USE_REAL ? real : mock;
 

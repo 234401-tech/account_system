@@ -27,7 +27,7 @@ export function AdminApp() {
     { k: "users", label: "회원관리", icon: Users },
   ];
   const pick = (c) => { setSel(c.id); setTab("review"); };
-  const cur = menu.find((m) => m.k === tab);
+  const cur = menu.find((m) => m.k === tab) || menu[0];
   return (
     <Shell role="admin" menu={menu} active={tab} onNav={(k) => { setTab(k); if (k !== "review") setSel(null); }} orgLabel="정산 모니터링" sub="정산담당 · 관리자">
       <Breadcrumb items={["관리자", cur.label]} />

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { Bell, LogOut } from "lucide-react";
 import { C } from "./lib/theme.js";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";

@@ -14,9 +14,8 @@ const delay = (v) => new Promise((r) => setTimeout(() => r(v), 80));
 const MOCK_USERS = [
   { id: "U-MASTER-001", email: "admin@ptp.or.kr", name: "최고관리자", role: "master", companyId: null },
   { id: "U-ADMIN-001", email: "admin@admin.kr", name: "이승모", role: "admin", companyId: null },
-  { id: `U-${SEED_COMPANIES[0].id}`, email: "test@test.kr", name: `${SEED_COMPANIES[0].name} 담당자`, role: "company", companyId: SEED_COMPANIES[0].id },
-  ...SEED_COMPANIES.slice(1).map((c) => ({
-    id: `U-${c.id}`, email: `${c.id.toLowerCase()}@biz.co.kr`, name: `${c.name} 담당자`, role: "company", companyId: c.id,
+  ...SEED_COMPANIES.map((c, i) => ({
+    id: `U-${c.id}`, email: i === 0 ? "test@test.kr" : `${c.id.toLowerCase()}@biz.co.kr`, name: `${c.name} 담당자`, role: "company", companyId: c.id,
   })),
 ];
 let currentUser = null;
