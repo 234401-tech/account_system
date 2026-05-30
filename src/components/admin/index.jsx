@@ -48,10 +48,34 @@ function getNextGBId(companies) {
   return `GB-${year}-${String((nums.length ? Math.max(...nums) : 0) + 1).padStart(3, "0")}`;
 }
 
+function ProjectEditForm({ project, onSave, onCancel }) {
+  const [f, setF] = useState({ name: project.name || "", announce: project.announce || "", task: project.task || "", pm: project.pm || "", consortium: project.consortium || "", period: project.period || "", status: project.status || "초기등록" });
+  const lbl = { background: "#F8F9FB", padding: "10px 14px", fontSize: 12.5, fontWeight: 700, color: C.text, borderRight: `1px solid ${C.lineSoft}`, display: "flex", alignItems: "center" };
+  const row = { display: "grid", gridTemplateColumns: "120px 1fr", borderBottom: `1px solid ${C.lineSoft}` };
+  const cl = { padding: "8px 14px", display: "flex", alignItems: "center", gap: 8 };
+  const wide = { ...inp, width: "100%", maxWidth: 400 };
+  return <div>
+    <div style={{ border: `1px solid ${C.line}`, borderRadius: 4, overflow: "hidden" }}>
+      <div style={row}><div style={lbl}>기업명</div><div style={cl}><input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} style={wide} /></div></div>
+      <div style={row}><div style={lbl}>사업명</div><div style={cl}><input value={f.announce} onChange={(e) => setF({ ...f, announce: e.target.value })} style={wide} /></div></div>
+      <div style={row}><div style={lbl}>과제명</div><div style={cl}><input value={f.task} onChange={(e) => setF({ ...f, task: e.target.value })} style={wide} /></div></div>
+      <div style={row}><div style={lbl}>연구책임자</div><div style={cl}><input value={f.pm} onChange={(e) => setF({ ...f, pm: e.target.value })} style={{ ...inp, width: 160 }} /></div></div>
+      <div style={row}><div style={lbl}>회사명</div><div style={cl}><input value={f.consortium} onChange={(e) => setF({ ...f, consortium: e.target.value })} style={{ ...inp, width: 200 }} /></div></div>
+      <div style={row}><div style={lbl}>협약기간</div><div style={cl}><input value={f.period} onChange={(e) => setF({ ...f, period: e.target.value })} style={{ ...inp, width: 280 }} /></div></div>
+      <div style={{ ...row, borderBottom: "none" }}><div style={lbl}>상태</div><div style={cl}><select value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })} style={inp}><option>초기등록</option><option>집행중</option><option>집행마감</option><option>검토중</option><option>보완요청</option><option>정산확정</option></select></div></div>
+    </div>
+    <div style={{ display: "flex", justifyContent: "flex-end", gap: 7, marginTop: 10 }}>
+      <Btn kind="default" onClick={onCancel}>취소</Btn>
+      <Btn kind="primary" onClick={() => onSave(f)}><Check size={13} /> 저장</Btn>
+    </div>
+  </div>;
+}
+
 export function IssueBoard() {
   const { companies, issueProject, updateBudgetTree } = useApp();
   const fileRef = useRef(null);
   const [mode, setMode] = useState("single");
+  const [editProject, setEditProject] = useState(null);
   const [bulk, setBulk] = useState([]);
   const [toast, setToast] = useState("");
   const [busy, setBusy] = useState(false);
@@ -197,9 +221,21 @@ export function IssueBoard() {
       </div>
     </>}
 
+    {/* 과제 편집 */}
+    {mode === "edit" && editProject && <Panel title={`과제 수정 — ${editProject.name}`} sub={editProject.id}>
+      <ProjectEditForm project={editProject} onSave={async (updated) => {
+        const { api: a } = await import("../../api/index.js");
+        await a.updateCompany(editProject.id, updated);
+        setToast("과제가 수정되었습니다.");
+        setMode("single"); setEditProject(null);
+        const { refreshCompanies: rc } = await import("../../context/AppContext.jsx").then(m => ({ refreshCompanies: null }));
+        window.location.reload();
+      }} onCancel={() => { setMode("single"); setEditProject(null); }} />
+    </Panel>}
+
     <Panel title="발급 완료 과제" sub="초기등록 대기 · 기업 등록 예정" pad={false}>
       <TableWrap>
-        <thead><tr>{["과제번호", "기업명", "사업명 / 과제명", "회사명", "구분", "사업비(원)", "협약기간", "상태"].map((h, i) => <th key={h} style={th(i === 5 ? "right" : "left")}>{h}</th>)}</tr></thead>
+        <thead><tr>{["과제번호", "기업명", "사업명 / 과제명", "회사명", "구분", "사업비(원)", "협약기간", "상태", ""].map((h, i) => <th key={h} style={th(i === 5 ? "right" : "left")}>{h}</th>)}</tr></thead>
         <tbody>
           {issued.length === 0 && <tr><td style={{ ...td(), textAlign: "center", color: C.sub }} colSpan={8}>초기등록 대기 중인 과제가 없습니다.</td></tr>}
           {issued.map((c) => {
@@ -213,6 +249,7 @@ export function IssueBoard() {
             <td style={{ ...td("right"), ...numCell, fontWeight: 700 }}>{bt.toLocaleString()}</td>
             <td style={{ ...td(), ...numCell }}>{c.period}</td>
             <td style={td()}><Status s={c.status} /></td>
+            <td style={td()}><Btn kind="default" sm onClick={() => { setEditProject(c); setMode("edit"); }}>수정</Btn></td>
           </tr>; })}
         </tbody>
       </TableWrap>
@@ -876,7 +913,12 @@ export function UserAdmin() {
                   <select value={u.role} onChange={async (e) => { const { api } = await import("../../api/index.js"); await api.updateUser(u.id, { role: e.target.value }); setToast(`${u.name} 역할이 변경되었습니다.`); loadUsers(); }} style={{ ...inp, padding: "3px 8px", fontSize: 12, fontWeight: 700, color: roleColor[u.role], borderColor: roleColor[u.role] }}>
                     <option value="company">기업</option><option value="admin">기관관리자</option><option value="auditor">회계사</option>
                   </select>}</td>
-                <td style={td()}>{u.companyName || u.company_name || <span style={{ color: C.faint }}>-</span>}</td>
+                <td style={td()}>{u.role === "company"
+                  ? <select value={u.company_id || ""} onChange={async (e) => { const { api: a } = await import("../../api/index.js"); await a.updateUser(u.id, { companyId: e.target.value || null }); setToast(`${u.name} 과제가 연결되었습니다.`); loadUsers(); }} style={{ ...inp, padding: "3px 6px", fontSize: 11, minWidth: 120 }}>
+                    <option value="">미연결</option>
+                    {companies.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.id})</option>)}
+                  </select>
+                  : <span style={{ color: C.faint }}>-</span>}</td>
                 <td style={{ ...td(), ...numCell }}>{u.created_at || u.createdAt || "-"}</td>
                 <td style={td()}>
                   <div style={{ display: "flex", gap: 4 }}>

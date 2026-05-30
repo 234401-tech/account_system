@@ -831,7 +831,13 @@ export function LedgerSheet({ companyId }) {
                   <td style={{ ...td(), color: C.sub }}>{row.bimok}</td>
                   <td style={{ ...td("right"), ...numCell, fontWeight: 700 }}>{(row.amount || 0).toLocaleString()}</td>
                   <td style={td()}>{(row.evidence_status === "첨부" || row.evidence_status === "검토완료")
-                    ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, color: row.evidence_status === "검토완료" ? C.blue : C.green, fontWeight: 700 }}><Paperclip size={11} /> {row.evidence_status}</span>
+                    ? <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, color: row.evidence_status === "검토완료" ? C.blue : C.green, fontWeight: 700 }}><Paperclip size={11} /> {row.evidence_status}</span>
+                        {(row.evidenceFiles || []).map((ef, ei) => (
+                          <a key={ei} href={ef.url || `/uploads/${ef.filename}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: C.blue, textDecoration: "underline" }}>{ef.original_name || ef.originalName || "파일"}</a>
+                        ))}
+                        <Btn kind="default" sm onClick={() => { setTarget(row.id); fileRef.current && fileRef.current.click(); }} style={{ marginLeft: 4 }}><Paperclip size={10} /> 추가</Btn>
+                      </div>
                     : <Btn kind="default" sm onClick={() => { setTarget(row.id); fileRef.current && fileRef.current.click(); }}><Paperclip size={11} /> 첨부</Btn>}</td>
                 </tr>
               ))}
@@ -980,9 +986,12 @@ export function AccountRegister({ registered, onRegistered }) {
     <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
       {/* 업로드 / 미리보기 */}
       <div style={{ width: 240, flexShrink: 0 }}>
-        <div onClick={() => ref.current && ref.current.click()} style={{ border: `1.5px dashed ${C.line}`, borderRadius: 6, height: 150, display: "grid", placeItems: "center", cursor: "pointer", background: "#FAFBFC", overflow: "hidden" }}>
+        <div onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) pickFile(f); }}
+          onDragOver={(e) => e.preventDefault()}
+          onClick={() => ref.current && ref.current.click()}
+          style={{ border: `2px dashed ${file && file.preview ? C.green : C.line}`, borderRadius: 6, height: 150, display: "grid", placeItems: "center", cursor: "pointer", background: "#FAFBFC", overflow: "hidden", transition: "all 0.15s" }}>
           {file && file.preview ? <img src={file.preview} alt="통장사본" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
-            : <div style={{ textAlign: "center", color: C.sub }}><Upload size={22} /><div style={{ fontSize: 12.5, marginTop: 6, fontWeight: 600 }}>통장사본 업로드</div><div style={{ fontSize: 11, marginTop: 2 }}>이미지 / PDF</div></div>}
+            : <div style={{ textAlign: "center", color: C.sub }}><Upload size={22} /><div style={{ fontSize: 12.5, marginTop: 6, fontWeight: 600 }}>통장사본 업로드</div><div style={{ fontSize: 11, marginTop: 2 }}>드래그하거나 클릭</div></div>}
         </div>
         <input ref={ref} type="file" accept="image/*,.pdf" style={{ display: "none" }} onChange={(e) => pickFile(e.target.files && e.target.files[0])} />
         {file && <div style={{ fontSize: 11.5, color: C.sub, marginTop: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{file.name}</div>}
@@ -997,7 +1006,7 @@ export function AccountRegister({ registered, onRegistered }) {
           <div style={{ ...row, borderBottom: "none" }}><div style={lbl}>예금주</div><div style={cell}><input value={acc.holder} onChange={(e) => setAcc({ ...acc, holder: e.target.value })} placeholder="예: (주)○○테크" style={{ ...inp, width: "100%", maxWidth: 240 }} /></div></div>
         </div>
         {err && <div style={{ fontSize: 12, color: C.red, marginTop: 8 }}>{err}</div>}
-        <div style={{ fontSize: 12, color: C.sub, marginTop: 8 }}>통장사본을 올리고 OCR 자동 인식을 누르면 계좌정보가 채워집니다. 인식 결과는 직접 수정할 수 있습니다.</div>
+        <div style={{ fontSize: 12, color: C.sub, marginTop: 8 }}>계좌정보를 직접 입력하거나, 통장사본 업로드 후 OCR 자동 인식을 시도할 수 있습니다. (OCR 미연동 시 직접 입력)</div>
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
           <Btn kind="primary" disabled={!ok} onClick={() => onRegistered(acc)}><Check size={14} /> 계좌 등록 완료</Btn>
         </div>

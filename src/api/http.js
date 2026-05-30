@@ -1,4 +1,4 @@
-import { http_get, http_post, http_put, http_upload } from "./client.js";
+import { http_get, http_post, http_put, http_del, http_upload } from "./client.js";
 
 // --- 인증 ---
 export const login = (email, password) => http_post("/api/auth/login", { email, password });
