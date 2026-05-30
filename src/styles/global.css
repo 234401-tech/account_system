@@ -1,0 +1,6 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Pretendard", -apple-system, BlinkMacSystemFont, sans-serif; }
+::-webkit-scrollbar { height: 9px; width: 9px; }
+::-webkit-scrollbar-thumb { background: #C7CCD2; border-radius: 5px; }
+::-webkit-scrollbar-track { background: #EEF0F3; }
+select, input, button { font-family: inherit; }
