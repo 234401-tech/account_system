@@ -455,18 +455,23 @@ export function ReviewDetail({ coId, onClose }) {
     ledger.forEach((r) => rows.push([SEMOK_TO_BIMOK[r.bimok] || r.bimok, r.date, r.desc, r.payee, r.bimok, r.amount || 0, r.evidence_status || "미첨부"]));
     downloadXlsx(`집행현황_${co.name}_${new Date().toISOString().slice(0, 10)}.xlsx`, rows);
   };
-  // 첨부파일 일괄 다운로드
-  const downloadAllEvidence = () => {
-    const filesWithUrl = ledger.flatMap((r) => (r.evidenceFiles || []).map((f) => ({ ...f, txnDate: r.date, txnDesc: r.desc })));
+  // 첨부파일 일괄 ZIP 다운로드
+  const downloadAllEvidence = async () => {
+    const filesWithUrl = ledger.flatMap((r) => (r.evidenceFiles || []).map((f) => ({ ...f, txnDate: r.date, txnDesc: r.desc, bimok: r.bimok })));
     if (filesWithUrl.length === 0) return alert("다운로드할 첨부파일이 없습니다.");
-    filesWithUrl.forEach((f, i) => {
-      setTimeout(() => {
-        const a = document.createElement("a");
-        a.href = `/uploads/${f.filename}`;
-        a.download = f.original_name || f.originalName || f.filename;
-        a.click();
-      }, i * 300);
-    });
+    try {
+      const JSZip = (await import("jszip")).default;
+      const { saveAs } = await import("file-saver");
+      const zip = new JSZip();
+      for (const f of filesWithUrl) {
+        try {
+          const res = await fetch(`/uploads/${f.filename}`);
+          if (res.ok) { const blob = await res.blob(); zip.file(f.original_name || f.originalName || f.filename, blob); }
+        } catch {}
+      }
+      const content = await zip.generateAsync({ type: "blob" });
+      saveAs(content, `증빙_${co.name}_${new Date().toISOString().slice(0, 10)}.zip`);
+    } catch (e) { console.error(e); alert("ZIP 생성 실패"); }
   };
 
   const markReviewed = async (txnId) => {
@@ -573,7 +578,14 @@ export function ReviewDetail({ coId, onClose }) {
                     <td style={td()}>{r.payee}</td>
                     <td style={{ ...td(), color: C.sub }}>{r.bimok}</td>
                     <td style={{ ...td("right"), ...numCell, fontWeight: 700 }}>{(r.amount || 0).toLocaleString()}</td>
-                    <td style={td()}><Tag text={r.evidence_status || "미첨부"} color={r.evidence_status === "검토완료" ? C.blue : r.evidence_status === "첨부" ? C.green : C.red} /></td>
+                    <td style={td()}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <Tag text={r.evidence_status || "미첨부"} color={r.evidence_status === "검토완료" ? C.blue : r.evidence_status === "첨부" ? C.green : C.red} />
+                        {(r.evidenceFiles || []).map((ef, ei) => (
+                          <a key={ei} href={`/uploads/${ef.filename}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: C.blue, textDecoration: "underline" }}>{ef.original_name || ef.originalName || "파일"}</a>
+                        ))}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </React.Fragment>;
