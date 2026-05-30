@@ -24,7 +24,6 @@ export function AdminApp() {
     { k: "amend", label: "협약변경 검토", icon: ClipboardCheck, badge: pendingAmend },
     { k: "review", label: "사업비 집행 검토", icon: ClipboardList },
     { k: "audit", label: "회계검토", icon: ScanSearch },
-    { k: "recover", label: "정산확정·환수", icon: Coins },
     { k: "users", label: "회원관리", icon: Users },
   ];
   const pick = (c) => { setSel(c.id); setTab("review"); };
@@ -38,7 +37,6 @@ export function AdminApp() {
       {tab === "amend" && <AmendReview />}
       {tab === "review" && (sel ? <ReviewDetail coId={sel} onClose={() => setSel(null)} /> : <TaskList onPick={pick} />)}
       {tab === "audit" && <AuditAdmin />}
-      {tab === "recover" && <RecoverBoard />}
       {tab === "users" && <UserAdmin />}
     </Shell>
   );

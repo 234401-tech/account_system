@@ -8,9 +8,8 @@ import { AdminApp } from "./components/admin/index.jsx";
 import { AuditorApp } from "./components/auditor/index.jsx";
 import { LoginPage } from "./components/auth/LoginPage.jsx";
 
-function Topbar({ view, setView }) {
+function Topbar() {
   const { user, logout } = useAuth();
-  const { companies } = useApp();
   if (!user) return null;
   return (
     <header style={{ background: C.navy, color: "#fff", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 20px", height: 52, position: "sticky", top: 0, zIndex: 40 }}>
@@ -20,11 +19,8 @@ function Topbar({ view, setView }) {
         <span style={{ fontSize: 11.5, color: "#8E9AA6", marginLeft: 2 }}>경북AI혁신본부</span>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        <div style={{ display: "flex", background: "#2A3845", borderRadius: 5, padding: 3 }}>
-          {[{ k: "company", l: "기업 포털" }, { k: "admin", l: "기관관리자" }, { k: "auditor", l: "회계사" }].map((x) => {
-            const on = view === x.k;
-            return <button key={x.k} onClick={() => setView(x.k)} style={{ border: "none", cursor: "pointer", borderRadius: 4, padding: "5px 14px", fontSize: 12, fontWeight: 700, background: on ? C.blue : "transparent", color: on ? "#fff" : "#9AA6B2" }}>{x.l}</button>;
-          })}
+        <div style={{ padding: "5px 12px", borderRadius: 4, fontSize: 11.5, fontWeight: 700, background: user.role === "master" || user.role === "admin" ? C.blue + "33" : user.role === "auditor" ? C.amber + "33" : C.teal + "33", color: user.role === "master" || user.role === "admin" ? "#B0C4FF" : user.role === "auditor" ? "#E0C080" : "#7EDCC8" }}>
+          {user.role === "master" ? "마스터 관리자" : user.role === "admin" ? "기관관리자" : user.role === "auditor" ? "회계사" : "기업 포털"}
         </div>
         <div style={{ position: "relative", cursor: "pointer" }}><Bell size={18} color="#B5C0CB" /><span style={{ position: "absolute", top: -2, right: -2, width: 7, height: 7, background: C.red, borderRadius: 999 }} /></div>
         <div style={{ fontSize: 12.5, color: "#C9D2DA" }}><b style={{ color: "#fff" }}>{user.name}</b> 님</div>
@@ -39,22 +35,19 @@ function Topbar({ view, setView }) {
 function Layout() {
   const { user, loading: authLoading } = useAuth();
   const { companies, loading: appLoading } = useApp();
-  const [view, setView] = useState(null);
-
   if (authLoading || appLoading) return <div style={{ padding: 40, color: C.sub, fontFamily: "Pretendard, sans-serif" }}>불러오는 중…</div>;
 
   if (!user) return <LoginPage />;
 
-  const activeView = view || (user.role === "admin" || user.role === "master" ? "admin" : user.role === "auditor" ? "auditor" : "company");
   const companyId = user.role === "company" ? user.companyId : (companies[0]?.id || null);
 
   return (
     <div style={{ color: C.text, minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column" }}>
-      <Topbar view={activeView} setView={setView} />
+      <Topbar />
       <div style={{ flex: 1, display: "flex" }}>
-        {activeView === "admin"
+        {(user.role === "admin" || user.role === "master")
           ? <AdminApp />
-          : activeView === "auditor"
+          : user.role === "auditor"
           ? <AuditorApp />
           : <CompanyPortal companyId={companyId} />}
       </div>
