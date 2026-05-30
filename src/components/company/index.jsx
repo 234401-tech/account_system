@@ -956,17 +956,38 @@ export function AccountRegister({ registered, onRegistered }) {
     reader.readAsDataURL(f);
   };
 
-  // 통장사본 OCR — api 어댑터 경유.
-  //  - mock: 더미 계좌정보 반환
-  //  - http(실 백엔드): POST /api/ocr/bankbook (멀티파트) → 비전 OCR 결과
+  // 통장사본 OCR — Tesseract.js (브라우저 측 무료 OCR)
   const runOcr = async () => {
     if (!file) return;
     setLoading(true); setErr("");
     try {
-      const parsed = await api.ocrBankbook(file.raw || file);
-      setAcc({ bank: parsed.bank || "", account: parsed.account || "", holder: parsed.holder || "" });
-      if (!parsed.account) setErr("계좌번호를 인식하지 못했습니다. 직접 입력해 주세요.");
-    } catch (e) { console.error(e); setErr("자동 인식에 실패했습니다. 직접 입력해 주세요."); }
+      const Tesseract = await import("tesseract.js");
+      const worker = await Tesseract.createWorker("kor+eng");
+      const { data: { text } } = await worker.recognize(file.raw || file.preview);
+      await worker.terminate();
+
+      // 텍스트에서 계좌 정보 추출
+      const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+      let bank = "", account = "", holder = "";
+
+      // 은행명 찾기
+      const banks = ["국민은행", "신한은행", "우리은행", "하나은행", "농협은행", "농협", "기업은행", "SC제일은행", "카카오뱅크", "케이뱅크", "토스뱅크", "수협", "대구은행", "부산은행", "경남은행", "광주은행", "전북은행", "제주은행", "산업은행", "새마을금고", "신협", "우체국"];
+      for (const line of lines) {
+        for (const b of banks) { if (line.includes(b)) { bank = b; break; } }
+        if (bank) break;
+      }
+
+      // 계좌번호 찾기 (숫자-숫자 패턴)
+      const accMatch = text.match(/\d{2,6}[-\s]?\d{2,6}[-\s]?\d{2,6}[-\s]?\d{0,4}/);
+      if (accMatch) account = accMatch[0].replace(/\s/g, "");
+
+      // 예금주 찾기 (괄호 안 또는 "예금주" 다음)
+      const holderMatch = text.match(/예금주[:\s]*([^\n]+)/) || text.match(/\(주\)[^\n]+/) || text.match(/주식회사\s*[^\n]+/);
+      if (holderMatch) holder = holderMatch[1] ? holderMatch[1].trim() : holderMatch[0].trim();
+
+      setAcc({ bank: bank || acc.bank, account: account || acc.account, holder: holder || acc.holder });
+      if (!account && !bank) setErr("인식 결과가 부족합니다. 직접 수정해 주세요.");
+    } catch (e) { console.error(e); setErr("OCR 인식에 실패했습니다. 직접 입력해 주세요."); }
     setLoading(false);
   };
 
