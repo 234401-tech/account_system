@@ -44,7 +44,7 @@ echo ========================================
 echo   Start server: start.bat
 echo   Update code:  update.bat
 echo.
-echo   URL: http://localhost:8080
+echo   URL: http://localhost:8090
 echo.
 echo   Master: admin@ptp.or.kr / admin1234
 echo   Admin:  admin@admin.kr / admin1234

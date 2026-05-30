@@ -17,13 +17,18 @@ if not exist "node_modules" call npm install
 if not exist "data" mkdir data
 if not exist "data\app.db" node seed.js
 
+:: Get local IP
+for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
+    for /f "tokens=1" %%b in ("%%a") do set LOCAL_IP=%%b
+)
+
 echo.
-echo   Server starting on port 8080...
-echo   http://localhost:8080
+echo ========================================
+echo   Server running on port 8090
 echo.
-echo   Master: admin@ptp.or.kr / admin1234
-echo   Admin:  admin@admin.kr / admin1234
-echo   Company: test@test.kr / test1234
+echo   Local:   http://localhost:8090
+echo   Network: http://%LOCAL_IP%:8090
+echo ========================================
 echo.
 
 node index.js

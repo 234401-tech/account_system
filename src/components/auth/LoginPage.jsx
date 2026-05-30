@@ -91,15 +91,6 @@ export function LoginPage() {
                 <Lock size={15} /> {busy ? "로그인 중..." : "로그인"}
               </button>
 
-              {/* 데모 안내 */}
-              <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px dashed ${C.line}` }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: C.sub, marginBottom: 10 }}>데모 계정 안내</div>
-                <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.8 }}>
-                  <div><b style={{ color: C.text }}>마스터</b> admin@ptp.or.kr / admin1234</div>
-                  <div><b style={{ color: C.text }}>기관관리자</b> admin@admin.kr / admin1234</div>
-                  <div><b style={{ color: C.text }}>기업</b> test@test.kr / test1234</div>
-                </div>
-              </div>
             </> : <>
               <div style={{ fontSize: 12.5, color: C.sub, marginBottom: 14, lineHeight: 1.6 }}>
                 가입 신청 후 관리자가 승인하면 본인 과제를 조회·관리할 수 있습니다.
