@@ -50,6 +50,28 @@ router.get("/me", authMiddleware, (req, res) => {
   res.json({ id: user.id, email: user.email, name: user.name, role: user.role, companyId: user.company_id });
 });
 
+// POST /api/auth/change-password (본인 비밀번호 변경)
+router.post("/change-password", authMiddleware, (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) return res.status(400).json({ error: "현재 비밀번호와 새 비밀번호를 입력하세요" });
+  if (newPassword.length < 4) return res.status(400).json({ error: "새 비밀번호는 4자 이상이어야 합니다" });
+  const user = db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id);
+  if (!user) return res.status(404).json({ error: "사용자를 찾을 수 없습니다" });
+  if (!bcrypt.compareSync(currentPassword, user.password_hash)) return res.status(401).json({ error: "현재 비밀번호가 일치하지 않습니다" });
+  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(bcrypt.hashSync(newPassword, 10), req.user.id);
+  res.json({ message: "비밀번호가 변경되었습니다" });
+});
+
+// POST /api/auth/reset-password (관리자가 초기화)
+router.post("/reset-password", authMiddleware, adminOnly, (req, res) => {
+  const { userId, newPassword } = req.body;
+  if (!userId || !newPassword) return res.status(400).json({ error: "사용자 ID와 새 비밀번호를 입력하세요" });
+  const user = db.prepare("SELECT id FROM users WHERE id = ?").get(userId);
+  if (!user) return res.status(404).json({ error: "사용자를 찾을 수 없습니다" });
+  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(bcrypt.hashSync(newPassword, 10), userId);
+  res.json({ message: "비밀번호가 초기화되었습니다" });
+});
+
 // POST /api/auth/signup
 router.post("/signup", (req, res) => {
   const { bizNo, companyName, contactName, email, password } = req.body;

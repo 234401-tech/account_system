@@ -828,6 +828,13 @@ export function UserAdmin() {
     loadUsers();
   };
 
+  const resetPw = async (userId, name) => {
+    const newPw = prompt(`${name} 비밀번호를 초기화합니다. 새 비밀번호:`);
+    if (!newPw) return;
+    const { api } = await import("../../api/index.js");
+    try { await api.resetPassword(userId, newPw); setToast(`${name} 비밀번호가 초기화되었습니다.`); } catch (e) { setToast("실패: " + e.message); }
+  };
+
   const rejectSignup = async (id) => {
     const { api } = await import("../../api/index.js");
     await api.rejectSignup(id);
@@ -872,7 +879,10 @@ export function UserAdmin() {
                 <td style={td()}>{u.companyName || u.company_name || <span style={{ color: C.faint }}>-</span>}</td>
                 <td style={{ ...td(), ...numCell }}>{u.created_at || u.createdAt || "-"}</td>
                 <td style={td()}>
-                  {u.role !== "master" && <Btn kind="danger" sm onClick={() => deleteUser(u.id)}><Trash2 size={11} /></Btn>}
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {u.role !== "master" && <Btn kind="default" sm onClick={() => resetPw(u.id, u.name)} title="비밀번호 초기화"><Settings size={11} /></Btn>}
+                    {u.role !== "master" && <Btn kind="danger" sm onClick={() => deleteUser(u.id)}><Trash2 size={11} /></Btn>}
+                  </div>
                 </td>
               </tr>
             ))}

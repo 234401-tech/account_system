@@ -59,6 +59,8 @@ export const signup = (data) => {
   return delay({ id, status: "대기", message: "가입 신청이 접수되었습니다. 관리자 승인 후 이용 가능합니다." });
 };
 
+export const changePassword = (_cur, _newPw) => delay({ message: "비밀번호가 변경되었습니다" });
+export const resetPassword = (_userId, _newPw) => delay({ message: "비밀번호가 초기화되었습니다" });
 export const listSignupRequests = () => delay([...signupRequests]);
 export const approveSignup = (id, companyId) => {
   const sr = signupRequests.find((r) => r.id === id);

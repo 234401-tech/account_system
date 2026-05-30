@@ -4,6 +4,8 @@ import { http_get, http_post, http_put, http_upload } from "./client.js";
 export const login = (email, password) => http_post("/api/auth/login", { email, password });
 export const me = () => http_get("/api/auth/me");
 export const signup = (data) => http_post("/api/auth/signup", data);
+export const changePassword = (currentPassword, newPassword) => http_post("/api/auth/change-password", { currentPassword, newPassword });
+export const resetPassword = (userId, newPassword) => http_post("/api/auth/reset-password", { userId, newPassword });
 export const listSignupRequests = () => http_get("/api/auth/signup-requests");
 export const approveSignup = (id, companyId) => http_post(`/api/auth/signup-requests/${id}/approve`, { companyId });
 export const rejectSignup = (id) => http_post(`/api/auth/signup-requests/${id}/reject`, {});

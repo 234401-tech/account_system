@@ -24,17 +24,14 @@ export function log(level, message) {
   logToFile(level, message);
 }
 
-// Express 미들웨어
 export function requestLogger(req, res, next) {
   const start = Date.now();
-  const origEnd = res.end;
-  res.end = function (...args) {
-    const duration = Date.now() - start;
-    const user = req.user ? `${req.user.id}(${req.user.role})` : "-";
+  res.on("finish", () => {
     if (req.path.startsWith("/api/")) {
-      log("INFO", `${req.method.padEnd(4)} ${req.path} ${res.statusCode} ${duration}ms ${user}`);
+      const duration = Date.now() - start;
+      const user = req.user ? `${req.user.id}(${req.user.role})` : "-";
+      log("INFO", `${req.method.padEnd(5)} ${req.path} ${res.statusCode} ${duration}ms ${user}`);
     }
-    origEnd.apply(res, args);
-  };
+  });
   next();
 }

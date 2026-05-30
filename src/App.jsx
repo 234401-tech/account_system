@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Bell, LogOut, FileText, Users, CreditCard, ClipboardList } from "lucide-react";
+import { Bell, LogOut, FileText, Users, CreditCard, ClipboardList, Lock, X } from "lucide-react";
 import { C } from "./lib/theme.js";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { AppProvider, useApp } from "./context/AppContext.jsx";
@@ -13,9 +13,40 @@ const notifIcon = { amend: FileText, signup: Users, exec: CreditCard, audit: Cli
 const notifColor = { amend: C.blue, signup: C.amber, exec: C.green, audit: C.teal };
 const notifTabs = [{ k: "all", l: "전체" }, { k: "amend", l: "협약변경" }, { k: "exec", l: "집행" }, { k: "audit", l: "회계검토" }, { k: "signup", l: "가입" }];
 
+function ChangePasswordModal({ onClose }) {
+  const [cur, setCur] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+  const submit = async () => {
+    setErr(""); setMsg("");
+    if (!cur || !newPw) return setErr("모든 항목을 입력하세요");
+    if (newPw.length < 4) return setErr("새 비밀번호는 4자 이상이어야 합니다");
+    if (newPw !== confirm) return setErr("새 비밀번호가 일치하지 않습니다");
+    try { const res = await api.changePassword(cur, newPw); setMsg(res.message || "변경되었습니다"); setCur(""); setNewPw(""); setConfirm(""); } catch (e) { setErr(e.message); }
+  };
+  const inp = { padding: "10px 12px", border: `1px solid ${C.line}`, borderRadius: 4, fontSize: 13, width: "100%", boxSizing: "border-box", outline: "none" };
+  return <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "grid", placeItems: "center", zIndex: 200 }} onClick={onClose}>
+    <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 8, padding: "24px", width: 380, boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <span style={{ fontSize: 16, fontWeight: 800 }}>비밀번호 변경</span>
+        <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color={C.sub} /></button>
+      </div>
+      <input type="password" value={cur} onChange={(e) => setCur(e.target.value)} placeholder="현재 비밀번호" style={{ ...inp, marginBottom: 10 }} />
+      <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="새 비밀번호" style={{ ...inp, marginBottom: 10 }} />
+      <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="새 비밀번호 확인" style={{ ...inp, marginBottom: 14 }} />
+      {err && <div style={{ fontSize: 12.5, color: C.red, marginBottom: 10, fontWeight: 600 }}>{err}</div>}
+      {msg && <div style={{ fontSize: 12.5, color: C.green, marginBottom: 10, fontWeight: 600 }}>{msg}</div>}
+      <button onClick={submit} style={{ width: "100%", padding: "11px", border: "none", borderRadius: 5, background: C.blue, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>변경</button>
+    </div>
+  </div>;
+}
+
 function Topbar() {
   const { user, logout } = useAuth();
   const [showNotif, setShowNotif] = useState(false);
+  const [showPwModal, setShowPwModal] = useState(false);
   const [notifs, setNotifs] = useState([]);
   const [notifTab, setNotifTab] = useState("all");
   const ref = useRef(null);
@@ -83,9 +114,13 @@ function Topbar() {
           </div>}
         </div>
         <div style={{ fontSize: 12.5, color: "#C9D2DA" }}><b style={{ color: "#fff" }}>{user.name}</b> 님</div>
+        <button onClick={() => setShowPwModal(true)} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "1px solid #3A4A5A", borderRadius: 4, padding: "5px 12px", cursor: "pointer", color: "#9AA6B2", fontSize: 12 }}>
+          <Lock size={13} />
+        </button>
         <button onClick={logout} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "1px solid #3A4A5A", borderRadius: 4, padding: "5px 12px", cursor: "pointer", color: "#9AA6B2", fontSize: 12 }}>
           <LogOut size={13} /> 로그아웃
         </button>
+        {showPwModal && <ChangePasswordModal onClose={() => setShowPwModal(false)} />}
       </div>
     </header>
   );
