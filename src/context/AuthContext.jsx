@@ -13,7 +13,7 @@ export function AuthProvider({ children }) {
     const token = localStorage.getItem("auth_token");
     if (!token) { setLoading(false); return; }
     api.me()
-      .then((u) => setUser(u))
+      .then((u) => { setUser(u); localStorage.setItem("auth_user", JSON.stringify(u)); })
       .catch(() => { localStorage.removeItem("auth_token"); localStorage.removeItem("auth_user"); })
       .finally(() => setLoading(false));
   }, []);

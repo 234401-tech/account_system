@@ -19,7 +19,10 @@ export function authMiddleware(req, res, next) {
   const header = req.headers.authorization;
   if (!header || !header.startsWith("Bearer ")) return res.status(401).json({ error: "인증이 필요합니다" });
   try {
-    req.user = verifyToken(header.slice(7));
+    const decoded = verifyToken(header.slice(7));
+    // DB에서 최신 role, company_id를 가져옴 (과제 연결 변경 즉시 반영)
+    const fresh = db.prepare("SELECT role, company_id FROM users WHERE id = ?").get(decoded.id);
+    req.user = { ...decoded, role: fresh?.role || decoded.role, companyId: fresh?.company_id || decoded.companyId };
     next();
   } catch { return res.status(401).json({ error: "유효하지 않은 토큰입니다" }); }
 }
