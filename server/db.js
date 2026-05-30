@@ -146,6 +146,17 @@ db.exec(`
     FOREIGN KEY (auditor_id) REFERENCES users(id)
   );
 
+  CREATE TABLE IF NOT EXISTS notifications (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     TEXT NOT NULL,
+    type        TEXT NOT NULL,
+    title       TEXT NOT NULL,
+    message     TEXT,
+    read        INTEGER DEFAULT 0,
+    created_at  TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
   CREATE TABLE IF NOT EXISTS audit_files (
     id            TEXT PRIMARY KEY,
     report_id     TEXT NOT NULL,

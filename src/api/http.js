@@ -48,6 +48,11 @@ export const decideAmendment = (id, decision, comment) =>
 export const attachAmendmentFile = (amendId, file) => http_upload(`/api/ledger/amendments/${amendId}/attachments`, file);
 export const getAmendmentTimeline = (companyId) => http_get(`/api/amendments/timeline/${companyId}`);
 
+// --- 알림 ---
+export const listNotifications = () => http_get("/api/notifications");
+export const markNotificationRead = (id) => http_post(`/api/notifications/read/${id}`, {});
+export const markAllNotificationsRead = () => http_post("/api/notifications/read-all", {});
+
 // --- 회원관리 ---
 export const listUsers = () => http_get("/api/users");
 export const createUser = (data) => http_post("/api/users", data);

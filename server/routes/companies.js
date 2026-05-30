@@ -32,7 +32,7 @@ router.get("/:id", (req, res) => {
 
 // POST /api/companies (과제 발급 — 관리자)
 router.post("/", (req, res) => {
-  if (req.user.role !== "admin") return res.status(403).json({ error: "관리자 권한이 필요합니다" });
+  if (req.user.role !== "admin" && req.user.role !== "master") return res.status(403).json({ error: "관리자 권한이 필요합니다" });
   const { id, name, task, pm, period, status, consortium, budget, email } = req.body;
 
   const emptyExec = Object.fromEntries(Object.keys(budget).map(k => [k, 0]));

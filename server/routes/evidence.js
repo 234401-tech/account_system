@@ -88,7 +88,7 @@ router.get("/:txnId/evidence", (req, res) => {
 
 // POST /api/ledger/:txnId/evidence/review
 router.post("/:txnId/evidence/review", (req, res) => {
-  if (req.user.role !== "admin") return res.status(403).json({ error: "관리자 권한이 필요합니다" });
+  if (req.user.role !== "admin" && req.user.role !== "master") return res.status(403).json({ error: "관리자 권한이 필요합니다" });
   db.prepare("UPDATE ledger SET evidence_status = '검토완료' WHERE id = ?").run(req.params.txnId);
   res.json({ ok: true });
 });

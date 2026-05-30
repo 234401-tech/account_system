@@ -1,6 +1,7 @@
 import { Router } from "express";
 import db from "../db.js";
 import { authMiddleware } from "./auth.js";
+import { createNotification, notifyRole } from "./notifications.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -49,12 +50,14 @@ router.post("/", (req, res) => {
   }
 
   const row = db.prepare("SELECT * FROM amendments WHERE id = ?").get(amendId);
+  notifyRole("admin", "amend", "협약변경 신청", `${company}에서 ${type}을 신청했습니다.`);
+  notifyRole("master", "amend", "협약변경 신청", `${company}에서 ${type}을 신청했습니다.`);
   res.status(201).json(amendRow(row));
 });
 
 // POST /api/amendments/:id/decision
 router.post("/:id/decision", (req, res) => {
-  if (req.user.role !== "admin") return res.status(403).json({ error: "관리자 권한이 필요합니다" });
+  if (req.user.role !== "admin" && req.user.role !== "master") return res.status(403).json({ error: "관리자 권한이 필요합니다" });
 
   const { decision, comment } = req.body;
   const now = new Date().toISOString().slice(0, 10);
@@ -80,6 +83,9 @@ router.post("/:id/decision", (req, res) => {
   }
 
   const row = db.prepare("SELECT * FROM amendments WHERE id = ?").get(req.params.id);
+  // 기업 담당자에게 알림
+  const companyUser = db.prepare("SELECT id FROM users WHERE company_id = ?").get(amend.company_id);
+  if (companyUser) createNotification(companyUser.id, "amend", `협약변경 ${decision}`, `${amend.type} 신청이 ${decision}되었습니다.${comment ? " 사유: " + comment : ""}`);
   res.json(amendRow(row));
 });
 

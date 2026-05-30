@@ -208,6 +208,12 @@ export const getAmendmentTimeline = (companyId) => {
   return delay(events);
 };
 
+// --- 알림 ---
+let mockNotifications = [];
+export const listNotifications = () => delay([...mockNotifications]);
+export const markNotificationRead = (id) => { mockNotifications = mockNotifications.map((n) => n.id === id ? { ...n, read: 1 } : n); return delay({ ok: true }); };
+export const markAllNotificationsRead = () => { mockNotifications = mockNotifications.map((n) => ({ ...n, read: 1 })); return delay({ ok: true }); };
+
 // --- 회원관리 ---
 export const listUsers = () => delay(MOCK_USERS.map((u) => ({ ...u })));
 export const createUser = (data) => {

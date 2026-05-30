@@ -97,7 +97,7 @@ router.get("/reports", (req, res) => {
 
 // POST /api/audit/reports
 router.post("/reports", (req, res) => {
-  if (req.user.role !== "auditor" && req.user.role !== "admin") return res.status(403).json({ error: "권한이 없습니다" });
+  if (req.user.role !== "auditor" && req.user.role !== "admin" && req.user.role !== "master") return res.status(403).json({ error: "권한이 없습니다" });
   const { companyId, opinion, summary } = req.body;
   const id = `AU-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   const now = new Date().toISOString().slice(0, 10);
