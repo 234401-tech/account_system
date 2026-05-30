@@ -52,6 +52,11 @@ export function AppProvider({ children }) {
     return saved;
   }, []);
 
+  const refreshAmendments = useCallback(async () => {
+    const as = await api.listAmendments();
+    setAmendments(as);
+  }, []);
+
   // --- 과제 ---
   const submitAmendment = async (a) => {
     const result = await api.submitAmendment(a);
@@ -94,7 +99,7 @@ export function AppProvider({ children }) {
       loadLedger, addLedgerEntries,
       loadBudgetTree, updateBudgetTree,
       submitAmendment, issueProject, completeRegistration, decideAmendment,
-      refreshCompanies,
+      refreshCompanies, refreshAmendments,
     }}>
       {children}
     </AppCtx.Provider>

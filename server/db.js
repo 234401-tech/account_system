@@ -18,7 +18,7 @@ db.exec(`
     email         TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     name          TEXT NOT NULL,
-    role          TEXT NOT NULL CHECK(role IN ('company','admin')),
+    role          TEXT NOT NULL CHECK(role IN ('company','admin','master','auditor')),
     company_id    TEXT,
     created_at    TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (company_id) REFERENCES companies(id)
@@ -122,6 +122,39 @@ db.exec(`
     size          INTEGER,
     uploaded_at   TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (amendment_id) REFERENCES amendments(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS auditor_assignments (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    auditor_id    TEXT NOT NULL,
+    company_id    TEXT NOT NULL,
+    UNIQUE(auditor_id, company_id),
+    FOREIGN KEY (auditor_id) REFERENCES users(id),
+    FOREIGN KEY (company_id) REFERENCES companies(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS audit_reports (
+    id            TEXT PRIMARY KEY,
+    company_id    TEXT NOT NULL,
+    auditor_id    TEXT NOT NULL,
+    opinion       TEXT,
+    summary       TEXT,
+    status        TEXT DEFAULT '미검토' CHECK(status IN ('미검토','검토중','검토완료','보완필요')),
+    submitted_at  TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (company_id) REFERENCES companies(id),
+    FOREIGN KEY (auditor_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS audit_files (
+    id            TEXT PRIMARY KEY,
+    report_id     TEXT NOT NULL,
+    filename      TEXT NOT NULL,
+    original_name TEXT NOT NULL,
+    mimetype      TEXT,
+    size          INTEGER,
+    uploaded_at   TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (report_id) REFERENCES audit_reports(id)
   );
 `);
 

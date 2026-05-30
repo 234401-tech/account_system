@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Building2, Check, ClipboardCheck, ClipboardList, Coins, Download, FilePlus, LayoutGrid, ScanSearch, Upload, X } from "lucide-react";
+import { Building2, Check, ClipboardCheck, ClipboardList, Coins, Download, FilePlus, FileText, LayoutGrid, Paperclip, ScanSearch, Settings, Trash2, Upload, UserPlus, Users, X } from "lucide-react";
 import { C, BIMOK, BIMOK_ORDER, SEMOK_TO_BIMOK, AMEND_STATUS } from "../../lib/theme.js";
 import { downloadXlsx, parseXlsx } from "../../lib/xlsx.js";
 import { sum, won, eok, rate } from "../../lib/format.js";
@@ -22,9 +22,10 @@ export function AdminApp() {
     { k: "issue", label: "과제 발급(협약체결)", icon: FilePlus },
     { k: "tasks", label: "지원기업·과제", icon: Building2 },
     { k: "amend", label: "협약변경 검토", icon: ClipboardCheck, badge: pendingAmend },
-    { k: "check", label: "집행점검", icon: ScanSearch },
-    { k: "review", label: "사용실적 검토", icon: ClipboardList },
+    { k: "review", label: "사업비 집행 검토", icon: ClipboardList },
+    { k: "audit", label: "회계검토", icon: ScanSearch },
     { k: "recover", label: "정산확정·환수", icon: Coins },
+    { k: "users", label: "회원관리", icon: Users },
   ];
   const pick = (c) => { setSel(c.id); setTab("review"); };
   const cur = menu.find((m) => m.k === tab);
@@ -35,9 +36,10 @@ export function AdminApp() {
       {tab === "tasks" && <TaskList onPick={pick} />}
       {tab === "issue" && <IssueBoard />}
       {tab === "amend" && <AmendReview />}
-      {tab === "check" && <CheckBoard onPick={pick} />}
-      {tab === "review" && (sel ? <ReviewDetail coId={sel} onClose={() => { setTab("tasks"); setSel(null); }} /> : <TaskList onPick={pick} />)}
+      {tab === "review" && (sel ? <ReviewDetail coId={sel} onClose={() => setSel(null)} /> : <TaskList onPick={pick} />)}
+      {tab === "audit" && <AuditAdmin />}
       {tab === "recover" && <RecoverBoard />}
+      {tab === "users" && <UserAdmin />}
     </Shell>
   );
 }
@@ -236,21 +238,36 @@ export function AmendReview() {
     </SearchBox>
     <Panel title="협약변경 신청 목록" sub={`총 ${list.length}건`} pad={false}>
       <TableWrap>
-        <thead><tr>{["신청번호", "기업명", "변경유형", "신청일", "상태", "검토"].map((h) => <th key={h} style={th()}>{h}</th>)}</tr></thead>
+        <thead><tr>{["신청번호", "기업명", "변경유형", "신청일", "첨부", "상태", "검토"].map((h) => <th key={h} style={th()}>{h}</th>)}</tr></thead>
         <tbody>
-          {list.length === 0 && <tr><td style={{ ...td(), textAlign: "center", color: C.sub }} colSpan={6}>해당 상태의 신청이 없습니다.</td></tr>}
+          {list.length === 0 && <tr><td style={{ ...td(), textAlign: "center", color: C.sub }} colSpan={7}>해당 상태의 신청이 없습니다.</td></tr>}
           {list.map((a) => <React.Fragment key={a.id}>
             <tr>
               <td style={{ ...td(), ...numCell, color: C.sub }}>{a.id}</td>
               <td style={{ ...td(), fontWeight: 700 }}>{a.company}</td>
               <td style={{ ...td(), fontWeight: 600 }}>{a.type}</td>
               <td style={{ ...td(), ...numCell }}>{a.submittedAt}</td>
+              <td style={td()}>{(a.attachments || []).length > 0
+                ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: C.green, fontWeight: 700 }}><Paperclip size={12} /> {a.attachments.length}건</span>
+                : <span style={{ fontSize: 12, color: C.faint }}>없음</span>}</td>
               <td style={td()}><Tag text={a.status} color={AMEND_STATUS[a.status]} /></td>
               <td style={td()}><Btn kind="default" sm onClick={() => { setOpen(open === a.id ? null : a.id); setComment(""); }}>{open === a.id ? "닫기" : "검토"}</Btn></td>
             </tr>
-            {open === a.id && <tr><td colSpan={6} style={{ padding: 16, background: "#FAFBFC", borderBottom: `1px solid ${C.lineSoft}` }}>
+            {open === a.id && <tr><td colSpan={7} style={{ padding: 16, background: "#FAFBFC", borderBottom: `1px solid ${C.lineSoft}` }}>
               <div style={{ fontSize: 12.5, marginBottom: 10 }}><b>변경사유</b> · {a.reason}</div>
               <AmendDiff a={a} />
+              {/* 첨부파일 */}
+              {(a.attachments || []).length > 0 && <div style={{ marginTop: 12, padding: "10px 14px", border: `1px solid ${C.line}`, borderRadius: 4, background: "#fff" }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: C.text, marginBottom: 8 }}>첨부파일 ({a.attachments.length}건)</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {a.attachments.map((f, fi) => (
+                    <a key={fi} href={f.url || (f.filename ? `/uploads/${f.filename}` : "#")} target="_blank" rel="noreferrer"
+                      style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", border: `1px solid ${C.line}`, borderRadius: 4, fontSize: 12.5, cursor: "pointer", background: "#fff", textDecoration: "none", color: C.text }}>
+                      <FileText size={14} color={C.blue} /> {f.originalName || f.original_name || f.name || "파일"}
+                    </a>
+                  ))}
+                </div>
+              </div>}
               {a.type === "사업비 변경" && a.status === "검토중" && <ImpactNote a={a} co={companies.find((c) => c.id === a.companyId)} />}
               {a.status === "검토중" ? <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                 <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="검토의견 (반려 시 사유 필수)" style={{ ...inp, flex: 1, minWidth: 220 }} />
@@ -266,8 +283,11 @@ export function AmendReview() {
 }
 
 // 승인 시 영향 안내 (초과 해소 여부 등)
-export function ImpactNote({ a, co }) {
+export function ImpactNote({ a: rawA, co }) {
   if (!co) return null;
+  const detail = rawA.detail ? (typeof rawA.detail === "string" ? JSON.parse(rawA.detail) : rawA.detail) : {};
+  const a = { ...detail, ...rawA };
+  if (!a.before || !a.after) return null;
   const beforeOver = BIMOK.filter((b) => (co.exec[b.key] || 0) > (a.before[b.key] || 0)).map((b) => b.key);
   const afterOver = BIMOK.filter((b) => (co.exec[b.key] || 0) > (a.after[b.key] || 0)).map((b) => b.key);
   const resolved = beforeOver.filter((k) => !afterOver.includes(k));
@@ -366,6 +386,7 @@ export function CheckBoard({ onPick }) {
 export function ReviewDetail({ coId, onClose }) {
   const { companies, ledgers, loadLedger, budgetTrees, loadBudgetTree } = useApp();
   const co = companies.find((c) => c.id === coId);
+  if (!co) return <div style={{ padding: 40, color: C.sub }}>과제 정보를 불러오는 중…</div>;
   const checks = runChecks(co);
   const [tab, setTab] = useState("summary");
   const [evFilter, setEvFilter] = useState("전체");
@@ -387,13 +408,46 @@ export function ReviewDetail({ coId, onClose }) {
 
   const filteredLedger = evFilter === "전체" ? ledger : ledger.filter((r) => r.evidence_status === evFilter);
 
+  // 엑셀 다운로드
+  const downloadSummaryXlsx = () => {
+    const getEx = (r) => r.exec_amt || r.exec || 0;
+    const rows = [["비목", "세목", "세세목", "예산(원)", "집행(원)", "잔액(원)", "집행률(%)"]];
+    tree.forEach((r) => rows.push([r.bimok, r.semok, r.sse, r.budget || 0, getEx(r), (r.budget || 0) - getEx(r), rate(getEx(r), r.budget)]));
+    downloadXlsx(`예산현황_${co.name}_${new Date().toISOString().slice(0, 10)}.xlsx`, rows);
+  };
+  const downloadLedgerXlsx = () => {
+    const rows = [["비목", "전표일자", "집행내역", "지급처", "세목", "집행액(원)", "증빙상태"]];
+    ledger.forEach((r) => rows.push([SEMOK_TO_BIMOK[r.bimok] || r.bimok, r.date, r.desc, r.payee, r.bimok, r.amount || 0, r.evidence_status || "미첨부"]));
+    downloadXlsx(`집행현황_${co.name}_${new Date().toISOString().slice(0, 10)}.xlsx`, rows);
+  };
+  // 첨부파일 일괄 다운로드
+  const downloadAllEvidence = () => {
+    const filesWithUrl = ledger.flatMap((r) => (r.evidenceFiles || []).map((f) => ({ ...f, txnDate: r.date, txnDesc: r.desc })));
+    if (filesWithUrl.length === 0) return alert("다운로드할 첨부파일이 없습니다.");
+    filesWithUrl.forEach((f, i) => {
+      setTimeout(() => {
+        const a = document.createElement("a");
+        a.href = `/uploads/${f.filename}`;
+        a.download = f.original_name || f.originalName || f.filename;
+        a.click();
+      }, i * 300);
+    });
+  };
+
   const markReviewed = async (txnId) => {
     await (await import("../../api/index.js")).api.reviewEvidence(txnId);
     loadLedger(coId);
   };
 
   return <>
-    <PageHead title={<span>사용실적 검토 — {co.name} <span style={{ fontSize: 14, color: C.sub, fontWeight: 500 }}>{co.id}</span></span>} actions={<Btn kind="default" sm onClick={onClose}><X size={13} /> 목록</Btn>} />
+    <PageHead title={<span>사업비 집행 검토 — {co.name} <span style={{ fontSize: 14, color: C.sub, fontWeight: 500 }}>{co.id}</span></span>} actions={
+      <div style={{ display: "flex", gap: 7 }}>
+        <Btn kind="default" sm onClick={downloadSummaryXlsx}><Download size={13} /> 예산현황</Btn>
+        <Btn kind="default" sm onClick={downloadLedgerXlsx}><Download size={13} /> 집행현황</Btn>
+        <Btn kind="default" sm onClick={downloadAllEvidence}><Download size={13} /> 첨부파일 일괄</Btn>
+        <Btn kind="default" sm onClick={onClose}><X size={13} /> 목록</Btn>
+      </div>
+    } />
     <InfoBar rows={[["과제명", co.task], ["주관", co.consortium], ["연구책임자", co.pm], ["협약기간", co.period]]} />
 
     {checks.length > 0 && <Panel title="자동 집행점검 결과" sub={`${checks.length}건`} pad={false}>
@@ -531,6 +585,180 @@ export function ReviewDetail({ coId, onClose }) {
   </>;
 }
 
+const auditStatusColor = { 검토완료: C.green, 보완필요: C.red, 검토중: C.amber, 미검토: C.gray };
+
+export function AuditAdmin() {
+  const { companies } = useApp();
+  const [adminTab, setAdminTab] = useState("status");
+  const [auditors, setAuditors] = useState([]);
+  const [assignments, setAssignments] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [open, setOpen] = useState(null);
+  const [toast, setToast] = useState("");
+  const [newAud, setNewAud] = useState({ name: "", email: "", password: "" });
+  const [localAssign, setLocalAssign] = useState({});
+
+  useEffect(() => { loadAuditData(); }, []);
+  useEffect(() => { if (toast) { const t = setTimeout(() => setToast(""), 3000); return () => clearTimeout(t); } }, [toast]);
+
+  const loadAuditData = async () => {
+    try {
+      const { api } = await import("../../api/index.js");
+      const [auds, asns, reps] = await Promise.all([api.listAuditors(), api.getAssignments(), api.listAuditReports()]);
+      setAuditors(auds);
+      setAssignments(asns);
+      setReports(reps);
+      const assignMap = {};
+      asns.forEach((a) => { assignMap[a.company_id || a.companyId] = a.auditor_id || a.auditorId; });
+      setLocalAssign(assignMap);
+    } catch (e) { console.error(e); }
+  };
+
+  const createAuditor = async () => {
+    if (!newAud.name || !newAud.email || !newAud.password) return;
+    const { api } = await import("../../api/index.js");
+    await api.createAuditor(newAud);
+    setNewAud({ name: "", email: "", password: "" });
+    setToast("회계사가 등록되었습니다.");
+    loadAuditData();
+  };
+
+  const saveAssignments = async () => {
+    const { api } = await import("../../api/index.js");
+    const list = Object.entries(localAssign).map(([companyId, auditorId]) => ({ companyId, auditorId }));
+    await api.saveAssignments(list);
+    setToast("배정이 저장되었습니다.");
+    loadAuditData();
+  };
+
+  const getReport = (companyId) => reports.find((r) => (r.company_id || r.companyId) === companyId);
+  const getAuditor = (companyId) => {
+    const auditorId = localAssign[companyId];
+    return auditors.find((a) => a.id === auditorId);
+  };
+
+  return <>
+    <PageHead title="회계검토" />
+    <div style={{ display: "flex", borderBottom: `2px solid ${C.line}`, marginBottom: 14 }}>
+      {[["status", "검토 현황"], ["auditors", "회계사 관리"], ["assign", "기업 배정"]].map(([k, l]) => (
+        <button key={k} onClick={() => setAdminTab(k)} style={{ padding: "10px 20px", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700, background: adminTab === k ? "#fff" : "transparent", color: adminTab === k ? C.blue : C.sub, borderBottom: adminTab === k ? `2.5px solid ${C.blue}` : "2.5px solid transparent", marginBottom: -2 }}>{l}</button>
+      ))}
+    </div>
+
+    {adminTab === "status" && <>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 14 }}>
+        <Kpi label="전체 과제" value={companies.length} unit="개" accent={C.gray} />
+        <Kpi label="검토완료" value={reports.filter((r) => r.status === "검토완료").length} unit="개" accent={C.green} />
+        <Kpi label="보완필요" value={reports.filter((r) => r.status === "보완필요").length} unit="개" accent={C.red} />
+        <Kpi label="미검토" value={companies.length - reports.length} unit="개" accent={C.amber} />
+      </div>
+      <Panel title="회계검토 현황" pad={false}>
+        <TableWrap>
+          <thead><tr>{["기업명", "담당 회계사", "검토일", "의견", "상태", "보고서", ""].map((h) => <th key={h} style={th()}>{h}</th>)}</tr></thead>
+          <tbody>
+            {companies.map((c) => {
+              const report = getReport(c.id);
+              const auditor = getAuditor(c.id);
+              const st = report?.status || "미검토";
+              return <React.Fragment key={c.id}>
+                <tr>
+                  <td style={{ ...td(), fontWeight: 700 }}>{c.name}</td>
+                  <td style={td()}>{auditor ? auditor.name : <span style={{ color: C.faint }}>미배정</span>}</td>
+                  <td style={{ ...td(), ...numCell }}>{report?.submitted_at || report?.submittedAt || "-"}</td>
+                  <td style={td()}>{report?.opinion ? <Tag text={report.opinion} color={report.opinion === "적정" ? C.green : C.red} /> : <span style={{ color: C.faint }}>-</span>}</td>
+                  <td style={td()}><Tag text={st} color={auditStatusColor[st]} /></td>
+                  <td style={td()}>{(report?.files || []).length > 0 ? <span style={{ fontSize: 12, color: C.green, fontWeight: 700 }}>{report.files.length}건</span> : <span style={{ color: C.faint }}>없음</span>}</td>
+                  <td style={td()}>{report && <Btn kind="default" sm onClick={() => setOpen(open === c.id ? null : c.id)}>{open === c.id ? "닫기" : "상세"}</Btn>}</td>
+                </tr>
+                {open === c.id && report && <tr><td colSpan={7} style={{ padding: 16, background: "#FAFBFC", borderBottom: `1px solid ${C.lineSoft}` }}>
+                  {report.summary && <div style={{ fontSize: 13, marginBottom: 10 }}><b>검토 요약:</b> {report.summary}</div>}
+                  {(report.files || []).length > 0 && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {report.files.map((f, i) => (
+                      <a key={i} href={`/uploads/${f.filename}`} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", border: `1px solid ${C.line}`, borderRadius: 4, fontSize: 12.5, background: "#fff", textDecoration: "none", color: C.text }}>
+                        <FileText size={14} color={C.blue} /> {f.original_name || f.originalName || f.filename} <Download size={12} color={C.sub} />
+                      </a>
+                    ))}
+                  </div>}
+                </td></tr>}
+              </React.Fragment>;
+            })}
+          </tbody>
+        </TableWrap>
+      </Panel>
+    </>}
+
+    {adminTab === "auditors" && <>
+      <Panel title="등록된 회계사" pad={false} extra={<span style={{ fontSize: 12.5, color: C.sub }}>{auditors.length}명</span>}>
+        {auditors.length === 0 ? <div style={{ padding: "24px 16px", textAlign: "center", color: C.sub }}>등록된 회계사가 없습니다.</div> :
+        <TableWrap>
+          <thead><tr>{["이름", "이메일", "배정 기업수", "배정 기업"].map((h) => <th key={h} style={th()}>{h}</th>)}</tr></thead>
+          <tbody>
+            {auditors.map((a) => (
+              <tr key={a.id}>
+                <td style={{ ...td(), fontWeight: 700 }}>{a.name}</td>
+                <td style={{ ...td(), color: C.sub }}>{a.email}</td>
+                <td style={{ ...td(), ...numCell }}>{(a.assigned || []).length}개</td>
+                <td style={td()}>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                    {(a.assigned || []).map((cid) => {
+                      const co = companies.find((c) => c.id === cid);
+                      return <Tag key={cid} text={co ? co.name : cid} color={C.blue} />;
+                    })}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </TableWrap>}
+      </Panel>
+      <Panel title="회계사 등록">
+        <div style={{ border: `1px solid ${C.line}`, borderRadius: 4, overflow: "hidden" }}>
+          {[
+            ["이름", <input value={newAud.name} onChange={(e) => setNewAud({ ...newAud, name: e.target.value })} placeholder="홍길동" style={{ ...inp, width: 200 }} />],
+            ["이메일", <input value={newAud.email} onChange={(e) => setNewAud({ ...newAud, email: e.target.value })} placeholder="auditor@email.com" style={{ ...inp, width: 300 }} />],
+            ["비밀번호", <input type="password" value={newAud.password} onChange={(e) => setNewAud({ ...newAud, password: e.target.value })} placeholder="초기 비밀번호" style={{ ...inp, width: 200 }} />],
+          ].map(([label, input]) => (
+            <div key={label} style={{ display: "grid", gridTemplateColumns: "110px 1fr", borderBottom: `1px solid ${C.lineSoft}` }}>
+              <div style={{ background: "#F8F9FB", padding: "10px 14px", fontSize: 12.5, fontWeight: 700, borderRight: `1px solid ${C.lineSoft}` }}>{label}</div>
+              <div style={{ padding: "8px 14px", display: "flex", alignItems: "center" }}>{input}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
+          <Btn kind="primary" disabled={!newAud.name || !newAud.email || !newAud.password} onClick={createAuditor}><Check size={13} /> 등록</Btn>
+        </div>
+      </Panel>
+    </>}
+
+    {adminTab === "assign" && <>
+      <Panel title="기업 배정" sub="회계사에게 검토할 기업을 배정합니다" pad={false}>
+        <TableWrap>
+          <thead><tr>{["기업명", "과제번호", "담당 회계사"].map((h) => <th key={h} style={th()}>{h}</th>)}</tr></thead>
+          <tbody>
+            {companies.map((co) => (
+              <tr key={co.id}>
+                <td style={{ ...td(), fontWeight: 700 }}>{co.name}</td>
+                <td style={{ ...td(), ...numCell, color: C.sub }}>{co.id}</td>
+                <td style={td()}>
+                  <select value={localAssign[co.id] || ""} onChange={(e) => setLocalAssign({ ...localAssign, [co.id]: e.target.value })} style={{ ...inp, padding: "5px 8px", fontSize: 12, minWidth: 200 }}>
+                    <option value="">미배정</option>
+                    {auditors.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.email})</option>)}
+                  </select>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </TableWrap>
+        <div style={{ display: "flex", justifyContent: "flex-end", padding: "12px 16px" }}>
+          <Btn kind="primary" onClick={saveAssignments}><Check size={13} /> 배정 저장</Btn>
+        </div>
+      </Panel>
+    </>}
+
+    {toast && <Toast text={toast} />}
+  </>;
+}
+
 export function RecoverBoard() {
   const { companies } = useApp();
   const rec = companies.filter((c) => c.status === "환수발생");
@@ -549,6 +777,167 @@ export function RecoverBoard() {
         </tbody>
       </TableWrap>
     </Panel>
+  </>;
+}
+
+/* ═══════════ 회원관리 ═══════════ */
+
+const roleLabel = { master: "마스터 관리자", admin: "기관관리자", company: "기업", auditor: "회계사" };
+const roleColor = { master: C.red, admin: C.blue, company: C.teal, auditor: C.amber };
+
+export function UserAdmin() {
+  const { companies } = useApp();
+  const [userTab, setUserTab] = useState("list");
+  const [users, setUsers] = useState([]);
+  const [signups, setSignups] = useState([]);
+  const [filter, setFilter] = useState("전체");
+  const [toast, setToast] = useState("");
+  const [newUser, setNewUser] = useState({ name: "", email: "", password: "", role: "company", companyId: "" });
+
+  useEffect(() => { loadUsers(); }, []);
+  useEffect(() => { if (toast) { const t = setTimeout(() => setToast(""), 3000); return () => clearTimeout(t); } }, [toast]);
+
+  const loadUsers = async () => {
+    try {
+      const { api } = await import("../../api/index.js");
+      const [us, srs] = await Promise.all([api.listUsers(), api.listSignupRequests()]);
+      setUsers(us);
+      setSignups(srs.filter((s) => s.status === "대기"));
+    } catch (e) { console.error(e); }
+  };
+
+  const createUser = async () => {
+    if (!newUser.name || !newUser.email || !newUser.password) return;
+    const { api } = await import("../../api/index.js");
+    await api.createUser(newUser);
+    setToast("계정이 생성되었습니다.");
+    setNewUser({ name: "", email: "", password: "", role: "company", companyId: "" });
+    loadUsers();
+  };
+
+  const deleteUser = async (id) => {
+    if (!confirm("정말 삭제하시겠습니까?")) return;
+    const { api } = await import("../../api/index.js");
+    await api.deleteUser(id);
+    setToast("계정이 삭제되었습니다.");
+    loadUsers();
+  };
+
+  const approveSignup = async (id, companyId) => {
+    const { api } = await import("../../api/index.js");
+    await api.approveSignup(id, companyId);
+    setToast("가입이 승인되었습니다.");
+    loadUsers();
+  };
+
+  const rejectSignup = async (id) => {
+    const { api } = await import("../../api/index.js");
+    await api.rejectSignup(id);
+    setToast("가입이 반려되었습니다.");
+    loadUsers();
+  };
+
+  const filtered = filter === "전체" ? users : users.filter((u) => u.role === { "마스터 관리자": "master", "기관관리자": "admin", "기업": "company", "회계사": "auditor" }[filter]);
+
+  return <>
+    <PageHead title="회원관리" />
+    <div style={{ display: "flex", borderBottom: `2px solid ${C.line}`, marginBottom: 14 }}>
+      {[["list", "전체 계정"], ["signup", `가입 승인 (${signups.length})`], ["create", "계정 생성"]].map(([k, l]) => (
+        <button key={k} onClick={() => setUserTab(k)} style={{ padding: "10px 20px", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700, background: userTab === k ? "#fff" : "transparent", color: userTab === k ? C.blue : C.sub, borderBottom: userTab === k ? `2.5px solid ${C.blue}` : "2.5px solid transparent", marginBottom: -2 }}>{l}</button>
+      ))}
+    </div>
+
+    {userTab === "list" && <>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginBottom: 14 }}>
+        <Kpi label="전체 계정" value={users.length} unit="명" accent={C.gray} />
+        <Kpi label="마스터 관리자" value={users.filter((u) => u.role === "master").length} unit="명" accent={C.red} />
+        <Kpi label="기관관리자" value={users.filter((u) => u.role === "admin").length} unit="명" accent={C.blue} />
+        <Kpi label="기업" value={users.filter((u) => u.role === "company").length} unit="명" accent={C.teal} />
+        <Kpi label="회계사" value={users.filter((u) => u.role === "auditor").length} unit="명" accent={C.amber} />
+      </div>
+      <SearchBox>
+        <Field label="역할"><select value={filter} onChange={(e) => setFilter(e.target.value)} style={inp}>{["전체", "마스터 관리자", "기관관리자", "기업", "회계사"].map((f) => <option key={f}>{f}</option>)}</select></Field>
+      </SearchBox>
+      <Panel title="계정 목록" sub={`${filtered.length}명`} pad={false}>
+        <TableWrap>
+          <thead><tr>{["이름", "이메일", "역할", "연결 기업", "가입일", "관리"].map((h) => <th key={h} style={th()}>{h}</th>)}</tr></thead>
+          <tbody>
+            {filtered.length === 0 && <tr><td style={{ ...td(), textAlign: "center", color: C.sub }} colSpan={6}>계정이 없습니다.</td></tr>}
+            {filtered.map((u) => (
+              <tr key={u.id}>
+                <td style={{ ...td(), fontWeight: 700 }}>{u.name}</td>
+                <td style={{ ...td(), color: C.sub }}>{u.email}</td>
+                <td style={td()}>{u.role === "master" ? <Tag text="마스터 관리자" color={C.red} /> :
+                  <select value={u.role} onChange={async (e) => { const { api } = await import("../../api/index.js"); await api.updateUser(u.id, { role: e.target.value }); setToast(`${u.name} 역할이 변경되었습니다.`); loadUsers(); }} style={{ ...inp, padding: "3px 8px", fontSize: 12, fontWeight: 700, color: roleColor[u.role], borderColor: roleColor[u.role] }}>
+                    <option value="company">기업</option><option value="admin">기관관리자</option><option value="auditor">회계사</option>
+                  </select>}</td>
+                <td style={td()}>{u.companyName || u.company_name || <span style={{ color: C.faint }}>-</span>}</td>
+                <td style={{ ...td(), ...numCell }}>{u.created_at || u.createdAt || "-"}</td>
+                <td style={td()}>
+                  {u.role !== "master" && <Btn kind="danger" sm onClick={() => deleteUser(u.id)}><Trash2 size={11} /></Btn>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </TableWrap>
+      </Panel>
+    </>}
+
+    {userTab === "signup" && <>
+      <Panel title="가입 승인 대기" sub={`${signups.length}건`} pad={false}>
+        {signups.length === 0 ? <div style={{ padding: "24px 16px", textAlign: "center", color: C.sub }}>대기 중인 가입 신청이 없습니다.</div> :
+        <TableWrap>
+          <thead><tr>{["기업명", "담당자", "이메일", "사업자번호", "신청일", "과제 매칭", "처리"].map((h) => <th key={h} style={th()}>{h}</th>)}</tr></thead>
+          <tbody>
+            {signups.map((sr) => (
+              <tr key={sr.id}>
+                <td style={{ ...td(), fontWeight: 700 }}>{sr.company_name || sr.companyName}</td>
+                <td style={td()}>{sr.contact_name || sr.contactName}</td>
+                <td style={{ ...td(), color: C.sub }}>{sr.email}</td>
+                <td style={{ ...td(), ...numCell }}>{sr.biz_no || sr.bizNo || "-"}</td>
+                <td style={{ ...td(), ...numCell }}>{sr.created_at || sr.createdAt}</td>
+                <td style={td()}>
+                  <select style={{ ...inp, padding: "4px 8px", fontSize: 12 }} id={`assign-${sr.id}`}>
+                    <option value="">미매칭</option>
+                    {companies.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.id})</option>)}
+                  </select>
+                </td>
+                <td style={td()}>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <Btn kind="ok" sm onClick={() => { const sel = document.getElementById(`assign-${sr.id}`); approveSignup(sr.id, sel?.value); }}><Check size={11} /> 승인</Btn>
+                    <Btn kind="danger" sm onClick={() => rejectSignup(sr.id)}><X size={11} /> 반려</Btn>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </TableWrap>}
+      </Panel>
+    </>}
+
+    {userTab === "create" && <>
+      <Panel title="계정 생성" sub="관리자가 직접 계정을 생성합니다">
+        <div style={{ border: `1px solid ${C.line}`, borderRadius: 4, overflow: "hidden" }}>
+          {[
+            ["역할", <select value={newUser.role} onChange={(e) => setNewUser({ ...newUser, role: e.target.value })} style={inp}><option value="company">기업</option><option value="auditor">회계사</option><option value="admin">기관관리자</option><option value="master">마스터 관리자</option></select>],
+            ["이름", <input value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} placeholder="홍길동" style={{ ...inp, width: 200 }} />],
+            ["이메일", <input value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} placeholder="user@email.com" style={{ ...inp, width: 300 }} />],
+            ["비밀번호", <input type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} placeholder="초기 비밀번호" style={{ ...inp, width: 200 }} />],
+            ["연결 과제", <select value={newUser.companyId} onChange={(e) => setNewUser({ ...newUser, companyId: e.target.value })} style={{ ...inp, minWidth: 250 }} disabled={newUser.role !== "company"}><option value="">선택 (기업 역할만)</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.id})</option>)}</select>],
+          ].map(([label, input]) => (
+            <div key={label} style={{ display: "grid", gridTemplateColumns: "110px 1fr", borderBottom: `1px solid ${C.lineSoft}` }}>
+              <div style={{ background: "#F8F9FB", padding: "10px 14px", fontSize: 12.5, fontWeight: 700, borderRight: `1px solid ${C.lineSoft}` }}>{label}</div>
+              <div style={{ padding: "8px 14px", display: "flex", alignItems: "center" }}>{input}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
+          <Btn kind="primary" disabled={!newUser.name || !newUser.email || !newUser.password} onClick={createUser}><UserPlus size={13} /> 계정 생성</Btn>
+        </div>
+      </Panel>
+    </>}
+
+    {toast && <Toast text={toast} />}
   </>;
 }
 

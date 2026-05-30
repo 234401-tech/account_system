@@ -196,6 +196,7 @@ const seedAll = db.transaction(() => {
   }
 
   // 사용자 계정
+  insertUser.run("U-MASTER-001", "admin@ptp.or.kr", hash("admin1234"), "최고관리자", "master", null);
   insertUser.run("U-ADMIN-001", "admin@admin.kr", hash("admin1234"), "이승모", "admin", null);
   // 첫 번째 기업은 test@test.kr, 나머지는 기존 패턴
   insertUser.run(`U-${companies[0].id}`, "test@test.kr", hash("test1234"), `${companies[0].name} 담당자`, "company", companies[0].id);

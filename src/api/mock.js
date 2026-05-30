@@ -12,6 +12,7 @@ const delay = (v) => new Promise((r) => setTimeout(() => r(v), 80));
 
 // --- 인증 (시뮬레이션) ---
 const MOCK_USERS = [
+  { id: "U-MASTER-001", email: "admin@ptp.or.kr", name: "최고관리자", role: "master", companyId: null },
   { id: "U-ADMIN-001", email: "admin@admin.kr", name: "이승모", role: "admin", companyId: null },
   { id: `U-${SEED_COMPANIES[0].id}`, email: "test@test.kr", name: `${SEED_COMPANIES[0].name} 담당자`, role: "company", companyId: SEED_COMPANIES[0].id },
   ...SEED_COMPANIES.slice(1).map((c) => ({
@@ -206,6 +207,51 @@ export const getAmendmentTimeline = (companyId) => {
   }
   events.sort((a, b) => a.date.localeCompare(b.date));
   return delay(events);
+};
+
+// --- 회원관리 ---
+export const listUsers = () => delay(MOCK_USERS.map((u) => ({ ...u })));
+export const createUser = (data) => {
+  const id = `U-${Date.now()}`;
+  const user = { id, ...data };
+  MOCK_USERS.push(user);
+  return delay(user);
+};
+export const updateUser = (id, data) => { const u = MOCK_USERS.find((x) => x.id === id); if (u) Object.assign(u, data); return delay({ ok: true }); };
+export const deleteUser = (id) => { const idx = MOCK_USERS.findIndex((x) => x.id === id); if (idx >= 0) MOCK_USERS.splice(idx, 1); return delay({ ok: true }); };
+
+// --- 회계검토 ---
+let auditorUsers = [];
+let auditAssignments = [];
+let auditReports = [];
+
+export const listAuditors = () => delay(auditorUsers.map((a) => ({ ...a, assigned: auditAssignments.filter((x) => x.auditorId === a.id).map((x) => x.companyId) })));
+export const createAuditor = (data) => {
+  const id = `AUD-${Date.now()}`;
+  const user = { id, name: data.name, email: data.email, role: "auditor" };
+  auditorUsers.push(user);
+  MOCK_USERS.push({ ...user, companyId: null });
+  return delay({ ...user, assigned: [] });
+};
+export const getAssignments = () => delay([...auditAssignments]);
+export const saveAssignments = (assignments) => { auditAssignments = assignments; return delay({ ok: true }); };
+export const listAuditReports = () => delay(auditReports.map((r) => ({ ...r })));
+export const createAuditReport = (data) => {
+  const id = `AU-${Date.now()}`;
+  const report = { id, ...data, auditorId: currentUser?.id, auditorName: currentUser?.name, status: data.opinion ? "검토완료" : "검토중", submittedAt: new Date().toISOString().slice(0, 10), files: [] };
+  auditReports.push(report);
+  return delay(report);
+};
+export const updateAuditReport = (id, data) => { auditReports = auditReports.map((r) => r.id === id ? { ...r, ...data } : r); return delay({ ok: true }); };
+export const uploadAuditFile = (reportId, file) => {
+  const meta = { id: `ARF-${Date.now()}`, filename: file.name, originalName: file.name, url: URL.createObjectURL(file) };
+  const report = auditReports.find((r) => r.id === reportId);
+  if (report) report.files.push(meta);
+  return delay(meta);
+};
+export const getMyAuditCompanies = () => {
+  const assigned = auditAssignments.filter((a) => a.auditorId === currentUser?.id).map((a) => a.companyId);
+  return delay(companies.filter((c) => assigned.includes(c.id)).map((c) => ({ ...c })));
 };
 
 // --- OCR ---

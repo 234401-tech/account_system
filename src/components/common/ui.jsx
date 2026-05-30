@@ -1,5 +1,5 @@
-import React from "react";
-import { Home, ChevronRight, Search, RotateCcw } from "lucide-react";
+import React, { useState, useRef } from "react";
+import { Home, ChevronRight, Search, RotateCcw, Upload, FileText, X } from "lucide-react";
 import { C, STATUS } from "../../lib/theme.js";
 
 /* 공통 테이블 셀 스타일 */
@@ -60,3 +60,40 @@ export function Toast({ text }) { return <div style={{ position: "fixed", bottom
 export function MiniBar({ v, color }) { return <div style={{ display: "inline-block", width: 70, height: 6, background: C.lineSoft, borderRadius: 2, overflow: "hidden", verticalAlign: "middle" }}><div style={{ width: `${Math.min(v, 100)}%`, height: "100%", background: color }} /></div>; }
 export const TableWrap = ({ children }) => <div style={{ border: `1px solid ${C.line}`, borderTop: `2px solid ${C.blue}`, borderRadius: 2, overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}>{children}</table></div>;
 export const InfoBar = ({ rows }) => <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 28px", padding: "11px 16px", background: C.blueLt, border: `1px solid ${C.blue}33`, borderRadius: 3, marginBottom: 14, fontSize: 12.5 }}>{rows.map(([k, v]) => <span key={k}><b style={{ color: C.blueDk }}>{k}</b> <span style={{ color: C.text, marginLeft: 5 }}>{v}</span></span>)}</div>;
+
+export function DropZone({ files, setFiles, maxFiles = 5, accept = ".pdf,.hwp,.docx,image/*", label = "첨부파일 (선택)", hint = "변경계획서, 견적서 등 관련 서류를 첨부하세요." }) {
+  const ref = useRef(null);
+  const [dragging, setDragging] = useState(false);
+
+  const addFiles = (fileList) => {
+    const newFiles = Array.from(fileList).slice(0, maxFiles - files.length).map((f) => ({ name: f.name, file: f, url: URL.createObjectURL(f) }));
+    if (newFiles.length) setFiles([...files, ...newFiles]);
+  };
+
+  const onDrop = (e) => { e.preventDefault(); setDragging(false); if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files); };
+  const onDragOver = (e) => { e.preventDefault(); setDragging(true); };
+  const onDragLeave = () => setDragging(false);
+  const onChange = (e) => { if (e.target.files.length) addFiles(e.target.files); e.target.value = ""; };
+
+  return <div style={{ border: `1px solid ${C.line}`, borderRadius: 4, padding: 16 }}>
+    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><FileText size={15} color={C.blue} /> {label}</div>
+    <div style={{ fontSize: 12.5, color: C.sub, marginBottom: 10 }}>{hint}</div>
+
+    {files.length > 0 && <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
+      {files.map((f, i) => (
+        <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 12px", border: `1px solid ${C.line}`, borderRadius: 4, background: "#FAFBFC" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}><FileText size={14} color={C.blue} /><span style={{ fontSize: 13, fontWeight: 600 }}>{f.name}</span></div>
+          <button onClick={() => setFiles(files.filter((_, idx) => idx !== i))} style={{ border: "none", background: "none", cursor: "pointer", color: C.red }}><X size={14} /></button>
+        </div>
+      ))}
+    </div>}
+
+    <div onDrop={onDrop} onDragOver={onDragOver} onDragLeave={onDragLeave} onClick={() => files.length < maxFiles && ref.current && ref.current.click()}
+      style={{ border: `2px dashed ${dragging ? C.blue : C.line}`, borderRadius: 6, padding: "16px 12px", textAlign: "center", cursor: files.length >= maxFiles ? "not-allowed" : "pointer", background: dragging ? C.blueLt : "#FAFBFC", transition: "all 0.15s" }}>
+      <Upload size={20} color={dragging ? C.blue : C.faint} style={{ marginBottom: 4 }} />
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: dragging ? C.blue : C.sub }}>{dragging ? "여기에 놓으세요" : "파일을 드래그하거나 클릭하여 첨부"}</div>
+      <div style={{ fontSize: 11.5, color: C.faint, marginTop: 2 }}>최대 {maxFiles}개</div>
+      <input ref={ref} type="file" accept={accept} multiple style={{ display: "none" }} onChange={onChange} />
+    </div>
+  </div>;
+}

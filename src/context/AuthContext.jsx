@@ -48,7 +48,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" || user?.role === "master";
   const isCompany = user?.role === "company";
 
   return (

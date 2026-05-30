@@ -32,11 +32,38 @@ export const reviewEvidence = (txnId) => http_post(`/api/ledger/${txnId}/evidenc
 
 // --- 협약변경 ---
 export const listAmendments = () => http_get("/api/amendments");
-export const submitAmendment = (a) => http_post("/api/amendments", a);
+export const submitAmendment = (a) => {
+  const { id, companyId, company, type, reason, before, after, periodBefore, periodAfter, researchersBefore, researchersAfter, ...rest } = a;
+  const detail = {};
+  if (before) detail.before = before;
+  if (after) detail.after = after;
+  if (periodBefore) detail.periodBefore = periodBefore;
+  if (periodAfter) detail.periodAfter = periodAfter;
+  if (researchersBefore) detail.researchersBefore = researchersBefore;
+  if (researchersAfter) detail.researchersAfter = researchersAfter;
+  return http_post("/api/amendments", { id, companyId, company, type, reason, detail });
+};
 export const decideAmendment = (id, decision, comment) =>
   http_post(`/api/amendments/${id}/decision`, { decision, comment });
 export const attachAmendmentFile = (amendId, file) => http_upload(`/api/ledger/amendments/${amendId}/attachments`, file);
 export const getAmendmentTimeline = (companyId) => http_get(`/api/amendments/timeline/${companyId}`);
+
+// --- 회원관리 ---
+export const listUsers = () => http_get("/api/users");
+export const createUser = (data) => http_post("/api/users", data);
+export const updateUser = (id, data) => http_put(`/api/users/${id}`, data);
+export const deleteUser = (id) => http_del(`/api/users/${id}`);
+
+// --- 회계검토 ---
+export const listAuditors = () => http_get("/api/audit/auditors");
+export const createAuditor = (data) => http_post("/api/audit/auditors", data);
+export const getAssignments = () => http_get("/api/audit/assignments");
+export const saveAssignments = (assignments) => http_post("/api/audit/assignments", { assignments });
+export const listAuditReports = () => http_get("/api/audit/reports");
+export const createAuditReport = (data) => http_post("/api/audit/reports", data);
+export const updateAuditReport = (id, data) => http_put(`/api/audit/reports/${id}`, data);
+export const uploadAuditFile = (reportId, file) => http_upload(`/api/audit/reports/${reportId}/files`, file);
+export const getMyAuditCompanies = () => http_get("/api/audit/my-companies");
 
 // --- OCR (백엔드 비전 API 필요, 일단 미구현) ---
 export const ocrBankbook = (file) => http_upload("/api/ocr/bankbook", file);

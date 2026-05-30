@@ -37,11 +37,16 @@ router.get("/", (req, res) => {
 // POST /api/amendments
 router.post("/", (req, res) => {
   const { id, companyId, company, type, reason, detail } = req.body;
-  const amendId = id || `AM-${Date.now()}`;
+  const amendId = id || `AM-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   const now = new Date().toISOString().slice(0, 10);
 
-  db.prepare(`INSERT INTO amendments (id,company_id,company_name,type,reason,submitted_at,status,detail) VALUES (?,?,?,?,?,?,?,?)`)
-    .run(amendId, companyId, company, type, reason || "", now, "검토중", JSON.stringify(detail || {}));
+  try {
+    db.prepare(`INSERT INTO amendments (id,company_id,company_name,type,reason,submitted_at,status,detail) VALUES (?,?,?,?,?,?,?,?)`)
+      .run(amendId, companyId, company, type, reason || "", now, "검토중", JSON.stringify(detail || {}));
+  } catch (e) {
+    if (e.message.includes("UNIQUE")) return res.status(409).json({ error: "이미 동일한 신청번호가 존재합니다. 다시 시도해주세요." });
+    throw e;
+  }
 
   const row = db.prepare("SELECT * FROM amendments WHERE id = ?").get(amendId);
   res.status(201).json(amendRow(row));

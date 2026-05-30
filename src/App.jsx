@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { AppProvider, useApp } from "./context/AppContext.jsx";
 import { CompanyPortal } from "./components/company/index.jsx";
 import { AdminApp } from "./components/admin/index.jsx";
+import { AuditorApp } from "./components/auditor/index.jsx";
 import { LoginPage } from "./components/auth/LoginPage.jsx";
 
 function Topbar({ view, setView }) {
@@ -20,7 +21,7 @@ function Topbar({ view, setView }) {
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
         <div style={{ display: "flex", background: "#2A3845", borderRadius: 5, padding: 3 }}>
-          {[{ k: "company", l: "기업 포털" }, { k: "admin", l: "관리자" }].map((x) => {
+          {[{ k: "company", l: "기업 포털" }, { k: "admin", l: "기관관리자" }, { k: "auditor", l: "회계사" }].map((x) => {
             const on = view === x.k;
             return <button key={x.k} onClick={() => setView(x.k)} style={{ border: "none", cursor: "pointer", borderRadius: 4, padding: "5px 14px", fontSize: 12, fontWeight: 700, background: on ? C.blue : "transparent", color: on ? "#fff" : "#9AA6B2" }}>{x.l}</button>;
           })}
@@ -44,7 +45,7 @@ function Layout() {
 
   if (!user) return <LoginPage />;
 
-  const activeView = view || (user.role === "admin" ? "admin" : "company");
+  const activeView = view || (user.role === "admin" || user.role === "master" ? "admin" : user.role === "auditor" ? "auditor" : "company");
   const companyId = user.role === "company" ? user.companyId : (companies[0]?.id || null);
 
   return (
@@ -53,6 +54,8 @@ function Layout() {
       <div style={{ flex: 1, display: "flex" }}>
         {activeView === "admin"
           ? <AdminApp />
+          : activeView === "auditor"
+          ? <AuditorApp />
           : <CompanyPortal companyId={companyId} />}
       </div>
     </div>

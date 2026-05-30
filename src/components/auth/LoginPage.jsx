@@ -95,7 +95,8 @@ export function LoginPage() {
               <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px dashed ${C.line}` }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: C.sub, marginBottom: 10 }}>데모 계정 안내</div>
                 <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.8 }}>
-                  <div><b style={{ color: C.text }}>관리자</b> admin@admin.kr / admin1234</div>
+                  <div><b style={{ color: C.text }}>마스터</b> admin@ptp.or.kr / admin1234</div>
+                  <div><b style={{ color: C.text }}>기관관리자</b> admin@admin.kr / admin1234</div>
                   <div><b style={{ color: C.text }}>기업</b> test@test.kr / test1234</div>
                 </div>
               </div>

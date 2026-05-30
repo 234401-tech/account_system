@@ -9,10 +9,14 @@ import { useAuth } from "../../context/AuthContext.jsx";
 import { api } from "../../api/index.js";
 import { Shell } from "../common/Shell.jsx";
 import { ExcelBulk } from "../common/ExcelBulk.jsx";
-import { th, td, numCell, inp, Tag, Status, Btn, Panel, Breadcrumb, PageHead, SearchBox, Field, Kpi, Toast, MiniBar, TableWrap, InfoBar } from "../common/ui.jsx";
+import { th, td, numCell, inp, Tag, Status, Btn, Panel, Breadcrumb, PageHead, SearchBox, Field, Kpi, Toast, MiniBar, TableWrap, InfoBar, DropZone } from "../common/ui.jsx";
 
-export function AmendDiff({ a }) {
+export function AmendDiff({ a: rawA }) {
+  // detail JSON이 있으면 펼쳐서 합침 (http 어댑터 대응)
+  const detail = rawA.detail ? (typeof rawA.detail === "string" ? JSON.parse(rawA.detail) : rawA.detail) : {};
+  const a = { ...detail, ...rawA };
   if (a.type === "사업비 변경") {
+    if (!a.before || !a.after) return <div style={{ padding: 14, fontSize: 13, color: C.sub }}>변경 상세 데이터가 없습니다.</div>;
     const tb = sum(a.before), ta = sum(a.after);
     return <TableWrap>
       <thead><tr>{["비목", "변경 전(원)", "변경 후(원)", "증감(원)"].map((h, i) => <th key={h} style={th(i ? "right" : "left")}>{h}</th>)}</tr></thead>
@@ -40,7 +44,7 @@ export function AmendDiff({ a }) {
       <span style={{ color: C.sub }}>{a.periodBefore}</span><ChevronRight size={16} color={C.blue} /><b style={{ color: C.blueDk }}>{a.periodAfter}</b>
     </div>;
   }
-  if (a.type === "참여연구원 변경") {
+  if (a.type === "참여연구원 변경" || a.type === "신규인력 추가" || a.type === "참여율 변경") {
     const bef = a.researchersBefore || [], aft = a.researchersAfter || [];
     const ids = [...new Set([...bef.map((r) => r.id), ...aft.map((r) => r.id)])];
     const rows = ids.map((id) => {
@@ -179,6 +183,7 @@ export function CompanyPortal({ companyId }) {
     { k: "budget", label: "예산 현황", icon: LayoutGrid },
     { k: "ledger", label: "예산 집행 현황", icon: ClipboardList },
     { k: "amend", label: "협약변경", icon: FileText, badge: pendingAmend },
+    { k: "audit", label: "회계검토 결과", icon: ClipboardList },
     { k: "settle", label: "정산·사용실적보고", icon: Send },
     { k: "rule", label: "연구비 사용기준", icon: BookText },
   ];
@@ -231,6 +236,7 @@ export function CompanyPortal({ companyId }) {
 
       {needsReg && tab !== "home" && <Panel title="초기 등록 필요"><div style={{ fontSize: 13, color: C.sub }}>과제가 발급되었으나 아직 초기 등록이 완료되지 않았습니다. <b style={{ color: C.text }}>과제 현황</b> 메뉴에서 초기 등록을 완료하면 이용할 수 있습니다.</div></Panel>}
 
+      {!needsReg && tab === "audit" && <AuditResult companyId={cid} />}
       {!needsReg && tab === "settle" && <SettleView co={co} checks={checks} onSubmit={() => setToast("집행마감 후 사용실적보고서가 제출되었습니다.")} />}
       {!needsReg && tab === "rule" && (
         <Panel title="연구비 사용기준" sub="자체규정 미등록 시 공무원 규정 기본 적용" pad={false}>
@@ -248,7 +254,8 @@ export function CompanyPortal({ companyId }) {
 const AMEND_DOT = { 신청: C.blue, 승인: C.green, 반려: C.red, 검토중: C.amber };
 
 export function CompanyAmend({ co, amends, onSubmit }) {
-  const [mode, setMode] = useState("list"); // list | timeline | new
+  const { refreshAmendments } = useApp();
+  const [mode, setMode] = useState("new"); // new | list | timeline
   const [open, setOpen] = useState(null);
 
   // 타임라인 이벤트 생성
@@ -262,7 +269,7 @@ export function CompanyAmend({ co, amends, onSubmit }) {
     <>
       {/* 뷰 탭 */}
       <div style={{ display: "flex", borderBottom: `2px solid ${C.line}`, marginBottom: 14 }}>
-        {[["list", "신청내역"], ["timeline", "변경이력"], ["new", "신규 신청"]].map(([k, l]) => (
+        {[["new", "신규 신청"], ["list", "신청내역"], ["timeline", "변경이력"]].map(([k, l]) => (
           <button key={k} onClick={() => setMode(k)} style={{ padding: "10px 20px", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700, background: mode === k ? "#fff" : "transparent", color: mode === k ? C.blue : C.sub, borderBottom: mode === k ? `2.5px solid ${C.blue}` : "2.5px solid transparent", marginBottom: -2 }}>{l}</button>
         ))}
       </div>
@@ -333,12 +340,12 @@ export function CompanyAmend({ co, amends, onSubmit }) {
       </Panel>}
 
       {/* 신규 신청 */}
-      {mode === "new" && <AmendForm co={co} onSubmit={async (a) => { await onSubmit(a); setMode("list"); }} />}
+      {mode === "new" && <AmendForm co={co} onSubmit={async (a) => { await onSubmit(a); setMode("list"); }} onFilesUploaded={refreshAmendments} />}
     </>
   );
 }
 
-export function AmendForm({ co, onSubmit, initType }) {
+export function AmendForm({ co, onSubmit, onFilesUploaded, initType }) {
   const [type, setType] = useState(initType || "사업비 변경");
   const [after, setAfter] = useState({ ...co.budget });
   const [periodAfter, setPeriodAfter] = useState(co.period);
@@ -363,41 +370,42 @@ export function AmendForm({ co, onSubmit, initType }) {
 
   const submit = async () => {
     const now = new Date();
-    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-    const dayAmends = (window.__amendCounter = (window.__amendCounter || 0) + 1);
-    const id = `GB-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${dayAmends}`;
+    const mmdd = `${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+    const seq = String(now.getHours()).padStart(2, "0") + String(now.getMinutes()).padStart(2, "0") + String(now.getSeconds()).padStart(2, "0");
+    const id = `GB-${now.getFullYear()}-${mmdd}-${seq}`;
     const submittedAt = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     const base = { id, companyId: co.id, company: co.name, type, reason: reason || "(사유 미입력)", submittedAt, status: "검토중", reviewComment: "", attachments: [] };
     let amend;
     if (type === "사업비 변경") amend = { ...base, before: { ...co.budget }, after: { ...after } };
     else if (type === "연구기간 변경") amend = { ...base, periodBefore: co.period, periodAfter };
-    else amend = { ...base, researchersBefore: co.researchers, researchersAfter: people.filter((p) => !p._removed).map(({ _new, _removed, ...r }) => r) };
+    else if (type === "신규인력 추가" || type === "참여연구원 변경" || type === "참여율 변경") amend = { ...base, researchersBefore: co.researchers, researchersAfter: people.filter((p) => !p._removed).map(({ _new, _removed, ...r }) => r) };
 
-    const result = await onSubmit(amend);
+    await onSubmit(amend);
     // 첨부파일 업로드
     for (const f of files) {
       try { await api.attachAmendmentFile(id, f.file); } catch (e) { console.error(e); }
     }
+    if (files.length > 0 && onFilesUploaded) await onFilesUploaded();
     setFiles([]);
   };
 
   return <>
     <div style={{ border: `1px solid ${C.line}`, borderTop: `2px solid ${C.blue}`, borderRadius: 2, marginBottom: 14 }}>
-      <div style={row}><div style={lbl}>변경유형</div><div style={cell}><select value={type} onChange={(e) => setType(e.target.value)} style={inp}><option>사업비 변경</option><option>연구기간 변경</option><option>참여연구원 변경</option></select></div></div>
+      <div style={row}><div style={lbl}>변경유형</div><div style={cell}><select value={type} onChange={(e) => setType(e.target.value)} style={inp}><option>사업비 변경</option><option>연구기간 변경</option><option>신규인력 추가</option><option>참여연구원 변경</option><option>참여율 변경</option></select></div></div>
       <div style={{ ...row, borderBottom: "none" }}><div style={lbl}>변경사유</div><div style={cell}><input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="변경 사유를 입력하세요" style={{ ...inp, width: "100%", maxWidth: 480 }} /></div></div>
     </div>
 
     {type === "사업비 변경" ? (
       <Panel title="비목별 사업비 변경(안)" sub="변경 후 금액을 입력하세요 (원 단위)" pad={false}>
         <TableWrap>
-          <thead><tr>{["비목", "현재 배정(천원)", "변경 후(천원)", "증감(천원)"].map((h, i) => <th key={h} style={th(i ? "right" : "left")}>{h}</th>)}</tr></thead>
+          <thead><tr>{["비목", "현재 배정(원)", "변경 후(원)", "증감(원)"].map((h, i) => <th key={h} style={th(i ? "right" : "left")}>{h}</th>)}</tr></thead>
           <tbody>
             {BIMOK.map((bm) => {
               const cur = co.budget[bm.key] || 0, nv = after[bm.key] || 0, d = nv - cur;
               return <tr key={bm.key} style={{ background: d ? (d > 0 ? C.greenLt : C.redLt) : "transparent" }}>
                 <td style={{ ...td(), fontWeight: 600 }}>{bm.key}</td>
                 <td style={{ ...td("right"), ...numCell }}>{cur.toLocaleString()}</td>
-                <td style={{ ...td("right") }}><input value={nv} onChange={(e) => setAfter({ ...after, [bm.key]: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} style={{ ...inp, width: 110, textAlign: "right", ...numCell }} /></td>
+                <td style={{ ...td("right") }}><input value={nv ? nv.toLocaleString() : "0"} onChange={(e) => setAfter({ ...after, [bm.key]: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} style={{ ...inp, width: 140, textAlign: "right", ...numCell }} /></td>
                 <td style={{ ...td("right"), ...numCell, fontWeight: 700, color: d > 0 ? C.green : d < 0 ? C.red : C.sub }}>{d === 0 ? "-" : `${d > 0 ? "+" : ""}${d.toLocaleString()}`}</td>
               </tr>;
             })}
@@ -417,49 +425,103 @@ export function AmendForm({ co, onSubmit, initType }) {
           <Field label="변경 후 종료일"><input type="date" value={periodAfter.split(" ~ ")[1] || "2026-12-31"} onChange={(e) => setPeriodAfter(`${co.period.split(" ~ ")[0]} ~ ${e.target.value}`)} style={inp} /></Field>
         </div>
       </Panel>
-    ) : (
-      <Panel title="참여연구원 변경(안)" sub="인원 추가·제외 및 참여율 조정" pad={false}
+    ) : type === "참여율 변경" ? (() => {
+      const selected = people.filter((p) => p._rateTarget);
+      const unselected = people.filter((p) => !p._rateTarget);
+      return <>
+        {/* 대상 선택 */}
+        <Panel title="변경 대상 선택" sub="참여율을 변경할 연구원을 선택하세요" pad={false}>
+          <TableWrap>
+            <thead><tr>{["선택", "성명", "역할", "직급", "현재 참여기간", "현재 참여율(%)", "인건비"].map((h, i) => <th key={h} style={th(i === 5 ? "right" : "left")}>{h}</th>)}</tr></thead>
+            <tbody>
+              {people.map((p, i) => (
+                <tr key={p.id} style={{ background: p._rateTarget ? C.blueLt : "transparent" }}>
+                  <td style={td()}><input type="checkbox" checked={!!p._rateTarget} onChange={() => setP(i, "_rateTarget", !p._rateTarget)} style={{ accentColor: C.blue }} /></td>
+                  <td style={{ ...td(), fontWeight: 700 }}>{p.name}</td>
+                  <td style={td()}>{p.role}</td>
+                  <td style={td()}>{p.position}</td>
+                  <td style={{ ...td(), ...numCell }}>{p.period || "-"}</td>
+                  <td style={{ ...td("right"), ...numCell, fontWeight: 700 }}>{p.rate}%</td>
+                  <td style={td()}>{p.salary ? "현금" : "현물"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </TableWrap>
+        </Panel>
+
+        {/* 선택된 대상 당초/변경 입력 */}
+        {selected.length > 0 && <Panel title="참여율 변경(안)" sub="당초 대비 변경 참여율·참여기간을 입력하세요" pad={false}>
+          <TableWrap>
+            <thead><tr>{["성명", "역할", "직급", "구분", "참여기간", "참여율(%)", "인건비"].map((h, i) => <th key={h} style={th(i === 5 ? "right" : "left")}>{h}</th>)}</tr></thead>
+            <tbody>
+              {selected.map((p) => {
+                const i = people.findIndex((x) => x.id === p.id);
+                const orig = co.researchers.find((r) => r.id === p.id);
+                const rateChanged = orig && (orig.rate !== p.rate || orig.period !== p.period);
+                return <React.Fragment key={p.id}>
+                  <tr style={{ background: C.amberLt }}>
+                    <td style={{ ...td(), fontWeight: 700 }} rowSpan={2}>{p.name}</td>
+                    <td style={{ ...td() }} rowSpan={2}>{p.role}</td>
+                    <td style={{ ...td() }} rowSpan={2}>{p.position}</td>
+                    <td style={{ ...td(), color: C.sub, fontWeight: 600 }}>당초</td>
+                    <td style={{ ...td(), ...numCell, color: C.sub }}>{orig ? orig.period : p.period}</td>
+                    <td style={{ ...td("right"), ...numCell, color: C.sub }}>{orig ? orig.rate : p.rate}%</td>
+                    <td style={{ ...td(), color: C.sub }} rowSpan={2}>{p.salary ? "현금" : "현물"}</td>
+                  </tr>
+                  <tr style={{ background: C.blueLt }}>
+                    <td style={{ ...td(), fontWeight: 700, color: C.blue }}>변경</td>
+                    <td style={td()}><input value={p.period || ""} onChange={(e) => setP(i, "period", e.target.value)} placeholder="2026-04-01 ~ 2026-12-31" style={{ ...inp, width: 220, ...numCell }} /></td>
+                    <td style={td("right")}><input value={p.rate} onChange={(e) => setP(i, "rate", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} style={{ ...inp, width: 60, textAlign: "right", ...numCell, fontWeight: 700, color: C.blue }} /></td>
+                  </tr>
+                </React.Fragment>;
+              })}
+              <tr style={{ background: "#F8F9FB" }}>
+                <td style={{ ...td(), fontWeight: 800 }} colSpan={5}>변경 후 참여율 합 (선택 대상)</td>
+                <td style={{ ...td("right"), ...numCell, fontWeight: 800 }}>{selected.filter((p) => p.salary).reduce((s, p) => s + Number(p.rate || 0), 0)}%</td>
+                <td style={td()} />
+              </tr>
+            </tbody>
+          </TableWrap>
+        </Panel>}
+      </>;
+    })()
+    : (type === "신규인력 추가" || type === "참여연구원 변경") ? (
+      <Panel title={type === "신규인력 추가" ? "신규인력 추가" : "참여연구원 변경(안)"}
+        sub={type === "신규인력 추가" ? "새로운 연구원을 추가합니다" : "연구원 추가·제외 및 참여율 조정"} pad={false}
         extra={<Btn kind="default" sm onClick={addP}><UserPlus size={13} /> 연구원 추가</Btn>}>
         <TableWrap>
-          <thead><tr>{["성명", "역할", "직급", "참여율(%)", "인건비", "관리"].map((h, i) => <th key={h} style={th(i === 3 ? "right" : "left")}>{h}</th>)}</tr></thead>
+          <thead><tr>{["성명", "역할", "직급", "참여율(%)", "참여기간", "인건비", "관리"].map((h, i) => <th key={h} style={th(i === 3 ? "right" : "left")}>{h}</th>)}</tr></thead>
           <tbody>
-            {people.map((p, i) => (
-              <tr key={p.id} style={{ background: p._removed ? C.redLt : p._new ? C.greenLt : "transparent", opacity: p._removed ? 0.6 : 1 }}>
-                <td style={td()}><input value={p.name} onChange={(e) => setP(i, "name", e.target.value)} disabled={p._removed} placeholder="성명" style={{ ...inp, width: 90, textDecoration: p._removed ? "line-through" : "none" }} /></td>
-                <td style={td()}><select value={p.role} onChange={(e) => setP(i, "role", e.target.value)} disabled={p._removed} style={{ ...inp, padding: "4px 6px" }}><option>연구책임자</option><option>참여연구원</option></select></td>
-                <td style={td()}><input value={p.position} onChange={(e) => setP(i, "position", e.target.value)} disabled={p._removed} style={{ ...inp, width: 90 }} /></td>
+            {people.map((p, i) => {
+              const isExisting = !p._new;
+              const nameDisabled = p._removed;
+              const showRemove = type === "참여연구원 변경";
+              return <tr key={p.id} style={{ background: p._removed ? C.redLt : p._new ? C.greenLt : "transparent", opacity: p._removed ? 0.6 : 1 }}>
+                <td style={td()}><input value={p.name} onChange={(e) => setP(i, "name", e.target.value)} disabled={nameDisabled} placeholder="성명" style={{ ...inp, width: 90, textDecoration: p._removed ? "line-through" : "none" }} /></td>
+                <td style={td()}><select value={p.role} onChange={(e) => setP(i, "role", e.target.value)} disabled={nameDisabled} style={{ ...inp, padding: "4px 6px" }}><option>연구책임자</option><option>참여연구원</option></select></td>
+                <td style={td()}><input value={p.position} onChange={(e) => setP(i, "position", e.target.value)} disabled={nameDisabled} style={{ ...inp, width: 90 }} /></td>
                 <td style={td("right")}><input value={p.rate} onChange={(e) => setP(i, "rate", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} disabled={p._removed} style={{ ...inp, width: 60, textAlign: "right", ...numCell, borderColor: p.rate > 100 ? C.red : C.line, color: p.rate > 100 ? C.red : C.text }} /></td>
-                <td style={td()}><select value={p.salary ? "현금" : "현물"} onChange={(e) => setP(i, "salary", e.target.value === "현금")} disabled={p._removed} style={{ ...inp, padding: "4px 6px" }}><option>현금</option><option>현물</option></select></td>
-                <td style={td()}>{p._new ? <Btn kind="default" sm onClick={() => setPeople(people.filter((_, idx) => idx !== i))}><Trash2 size={12} /></Btn> : <Btn kind={p._removed ? "default" : "danger"} sm onClick={() => toggleRemove(i)}>{p._removed ? <><RotateCw size={12} /> 복원</> : "제외"}</Btn>}</td>
-              </tr>
-            ))}
+                <td style={td()}><input value={p.period || ""} onChange={(e) => setP(i, "period", e.target.value)} disabled={nameDisabled} placeholder="2026-02-01 ~ 2026-11-30" style={{ ...inp, width: 220, ...numCell }} /></td>
+                <td style={td()}><select value={p.salary ? "현금" : "현물"} onChange={(e) => setP(i, "salary", e.target.value === "현금")} disabled={nameDisabled} style={{ ...inp, padding: "4px 6px" }}><option>현금</option><option>현물</option></select></td>
+                <td style={td()}>
+                  {p._new && <Btn kind="default" sm onClick={() => setPeople(people.filter((_, idx) => idx !== i))}><Trash2 size={12} /></Btn>}
+                  {isExisting && showRemove && <Btn kind={p._removed ? "default" : "danger"} sm onClick={() => toggleRemove(i)}>{p._removed ? <><RotateCw size={12} /> 복원</> : "제외"}</Btn>}
+                </td>
+              </tr>;
+            })}
             <tr style={{ background: "#F8F9FB" }}>
               <td style={{ ...td(), fontWeight: 800 }} colSpan={3}>현금계상 참여율 합</td>
               <td style={{ ...td("right"), ...numCell, fontWeight: 800 }}>{people.filter((p) => !p._removed && p.salary).reduce((s, p) => s + Number(p.rate || 0), 0)}%</td>
-              <td style={td()} colSpan={2} />
+              <td style={td()} colSpan={3} />
             </tr>
           </tbody>
         </TableWrap>
-        <div style={{ display: "flex", gap: 7, padding: "10px 0 0", fontSize: 12, color: C.sub }}><Info size={14} style={{ flexShrink: 0, marginTop: 1 }} /> 개인 참여율 100% 초과 시 자동 점검에서 적발됩니다. 인건비 계상(현금) 인원의 참여율 합계를 확인하세요.</div>
+        <div style={{ display: "flex", gap: 7, padding: "10px 0 0", fontSize: 12, color: C.sub }}><Info size={14} style={{ flexShrink: 0, marginTop: 1 }} /> 개인 참여율 100% 초과 시 자동 점검에서 적발됩니다.</div>
       </Panel>
-    )}
+    ) : null}
     {/* 첨부파일 */}
-    <div style={{ border: `1px solid ${C.line}`, borderRadius: 4, padding: 16, marginBottom: 14 }}>
-      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><Paperclip size={15} color={C.blue} /> 첨부파일 (선택)</div>
-      <div style={{ fontSize: 12.5, color: C.sub, marginBottom: 10 }}>변경계획서, 견적서 등 관련 서류를 첨부하세요.</div>
-      {files.length > 0 && <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
-        {files.map((f, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 12px", border: `1px solid ${C.line}`, borderRadius: 4, background: "#FAFBFC" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><FileText size={14} color={C.blue} /><span style={{ fontSize: 13, fontWeight: 600 }}>{f.name}</span></div>
-            <button onClick={() => setFiles(files.filter((_, idx) => idx !== i))} style={{ border: "none", background: "none", cursor: "pointer", color: C.red }}><X size={14} /></button>
-          </div>
-        ))}
-      </div>}
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <Btn kind="default" sm onClick={() => fileRef.current && fileRef.current.click()} disabled={files.length >= 5}><Upload size={13} /> 파일 첨부</Btn>
-        <span style={{ fontSize: 12, color: C.sub }}>최대 5개</span>
-        <input ref={fileRef} type="file" accept=".pdf,.hwp,.docx,image/*" style={{ display: "none" }} onChange={addFile} />
-      </div>
+    <div style={{ marginBottom: 14 }}>
+      <DropZone files={files} setFiles={setFiles} />
     </div>
     <div style={{ display: "flex", justifyContent: "flex-end" }}><Btn kind="primary" onClick={submit}><Send size={13} /> 협약변경 신청 제출</Btn></div>
   </>;
@@ -1045,7 +1107,7 @@ export function CompanyLogin({ companies, onLogin }) {
 
 /* ═══════════ 통장 관리 ═══════════ */
 
-const MOCK_MONTHS = ["2026-01", "2026-02", "2026-03", "2026-04", "2026-05"];
+const MOCK_MONTHS = ["2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10", "2026-11", "2026-12"];
 
 export function BankManager({ companyId }) {
   const [bookImg, setBookImg] = useState(null);
@@ -1108,25 +1170,22 @@ export function BankManager({ companyId }) {
     <Panel title="사업비 통장사본" sub="협약 시 등록한 사업비 전용계좌 통장사본">
       <div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-start" }}>
         <div style={{ width: 280, flexShrink: 0 }}>
-          <div onClick={() => bookRef.current && bookRef.current.click()}
-            style={{ border: `1.5px dashed ${bookPreview ? C.green : C.line}`, borderRadius: 8, height: 200, display: "grid", placeItems: "center", cursor: "pointer", background: bookPreview ? "#fff" : "#FAFBFC", overflow: "hidden" }}>
+          <div onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) { setBookImg(f); setBookPreview(URL.createObjectURL(f)); setToast("통장사본이 등록되었습니다."); } }}
+            onDragOver={(e) => e.preventDefault()}
+            onClick={() => bookRef.current && bookRef.current.click()}
+            style={{ border: `2px dashed ${bookPreview ? C.green : C.line}`, borderRadius: 8, height: 200, display: "grid", placeItems: "center", cursor: "pointer", background: bookPreview ? "#fff" : "#FAFBFC", overflow: "hidden", transition: "all 0.15s" }}>
             {bookPreview
               ? <img src={bookPreview} alt="통장사본" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
               : <div style={{ textAlign: "center", color: C.sub }}>
-                  <Image size={28} style={{ marginBottom: 6 }} />
+                  <Upload size={24} style={{ marginBottom: 6 }} />
                   <div style={{ fontSize: 13, fontWeight: 700 }}>통장사본 업로드</div>
-                  <div style={{ fontSize: 11.5, marginTop: 3 }}>클릭하여 이미지 등록</div>
+                  <div style={{ fontSize: 11.5, marginTop: 3 }}>드래그하거나 클릭</div>
                 </div>}
           </div>
           <input ref={bookRef} type="file" accept="image/*,.pdf" style={{ display: "none" }} onChange={handleBookUpload} />
           {bookImg && <div style={{ fontSize: 12, color: C.sub, marginTop: 6, display: "flex", alignItems: "center", gap: 5 }}>
             <Paperclip size={11} /> {bookImg.name}
           </div>}
-          <div style={{ marginTop: 8 }}>
-            <Btn kind="default" sm onClick={() => bookRef.current && bookRef.current.click()}>
-              <Upload size={13} /> {bookPreview ? "다시 업로드" : "통장사본 업로드"}
-            </Btn>
-          </div>
         </div>
         <div style={{ flex: 1, minWidth: 240 }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: C.text }}>계좌 정보</div>
@@ -1221,5 +1280,75 @@ export function BankManager({ companyId }) {
       </div>}
     </Panel>
     {toast && <Toast text={toast} />}
+  </>;
+}
+
+/* ═══════════ 회계검토 결과 (기업 열람) ═══════════ */
+
+export function AuditResult({ companyId }) {
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const reps = await api.listAuditReports();
+        setReports(reps.filter((r) => (r.company_id || r.companyId) === companyId));
+      } catch (e) { console.error(e); }
+      setLoading(false);
+    })();
+  }, [companyId]);
+
+  if (loading) return <div style={{ padding: 24, color: C.sub }}>불러오는 중…</div>;
+
+  const report = reports[0];
+
+  return <>
+    <PageHead title="회계검토 결과" />
+    {!report ? (
+      <Panel title="검토 결과">
+        <div style={{ padding: "24px 0", textAlign: "center", color: C.sub }}>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>아직 회계검토가 완료되지 않았습니다</div>
+          <div style={{ fontSize: 12, marginTop: 4 }}>검토가 완료되면 결과가 여기에 표시됩니다.</div>
+        </div>
+      </Panel>
+    ) : <>
+      {report.status === "검토완료" && report.opinion === "적정" && (
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", background: C.greenLt, border: `1px solid ${C.green}55`, borderRadius: 4, marginBottom: 14, fontSize: 13, fontWeight: 700, color: C.green }}>
+          <Check size={15} /> 검토 완료 — {report.opinion} 의견
+        </div>
+      )}
+      {report.status === "보완필요" && (
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", background: C.redLt, border: `1px solid ${C.red}55`, borderRadius: 4, marginBottom: 14, fontSize: 13, fontWeight: 700, color: C.red }}>
+          보완 필요 — {report.opinion} 의견
+        </div>
+      )}
+      <Panel title="검토 내용">
+        <div style={{ border: `1px solid ${C.line}`, borderRadius: 4, overflow: "hidden", marginBottom: 14 }}>
+          {[
+            ["담당 회계사", report.auditorName || report.auditor_name || "-"],
+            ["검토일", report.submitted_at || report.submittedAt || "-"],
+            ["검토 의견", report.opinion || "-"],
+            ["검토 요약", report.summary || "-"],
+          ].map(([label, val], i, arr) => (
+            <div key={label} style={{ display: "grid", gridTemplateColumns: "110px 1fr", borderBottom: i < arr.length - 1 ? `1px solid ${C.lineSoft}` : "none" }}>
+              <div style={{ background: "#F8F9FB", padding: "10px 14px", fontSize: 12.5, fontWeight: 700, borderRight: `1px solid ${C.lineSoft}` }}>{label}</div>
+              <div style={{ padding: "10px 14px", fontSize: 13, color: label === "검토 의견" ? (val === "적정" ? C.green : C.red) : C.text, fontWeight: label === "검토 의견" ? 700 : 400 }}>{val}</div>
+            </div>
+          ))}
+        </div>
+        {(report.files || []).length > 0 && <>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: C.sub, marginBottom: 8 }}>보고서 파일</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {report.files.map((f, i) => (
+              <a key={i} href={f.url || `/uploads/${f.filename}`} target="_blank" rel="noreferrer"
+                style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "8px 14px", border: `1px solid ${C.line}`, borderRadius: 4, fontSize: 13, background: "#fff", cursor: "pointer", textDecoration: "none", color: C.text }}>
+                <FileText size={14} color={C.blue} /> {f.original_name || f.originalName || f.filename} <Download size={13} color={C.sub} />
+              </a>
+            ))}
+          </div>
+        </>}
+      </Panel>
+    </>}
   </>;
 }

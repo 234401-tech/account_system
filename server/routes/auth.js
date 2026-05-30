@@ -25,7 +25,7 @@ export function authMiddleware(req, res, next) {
 }
 
 export function adminOnly(req, res, next) {
-  if (req.user?.role !== "admin") return res.status(403).json({ error: "관리자 권한이 필요합니다" });
+  if (req.user?.role !== "admin" && req.user?.role !== "master") return res.status(403).json({ error: "관리자 권한이 필요합니다" });
   next();
 }
 
