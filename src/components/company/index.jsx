@@ -1016,7 +1016,7 @@ export function AccountRegister({ registered, onRegistered }) {
         </div>
         <input ref={ref} type="file" accept="image/*,.pdf" style={{ display: "none" }} onChange={(e) => pickFile(e.target.files && e.target.files[0])} />
         {file && <div style={{ fontSize: 11.5, color: C.sub, marginTop: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{file.name}</div>}
-        <Btn kind="primary" sm onClick={runOcr} disabled={!file || loading}><ScanSearch size={13} /> {loading ? "인식 중..." : "OCR 자동 인식"}</Btn>
+        {/* OCR 버튼 — 추후 API 연동 시 활성화 */}
       </div>
 
       {/* 인식 결과 / 입력 */}
@@ -1027,7 +1027,7 @@ export function AccountRegister({ registered, onRegistered }) {
           <div style={{ ...row, borderBottom: "none" }}><div style={lbl}>예금주</div><div style={cell}><input value={acc.holder} onChange={(e) => setAcc({ ...acc, holder: e.target.value })} placeholder="예: (주)○○테크" style={{ ...inp, width: "100%", maxWidth: 240 }} /></div></div>
         </div>
         {err && <div style={{ fontSize: 12, color: C.red, marginTop: 8 }}>{err}</div>}
-        <div style={{ fontSize: 12, color: C.sub, marginTop: 8 }}>계좌정보를 직접 입력하거나, 통장사본 업로드 후 OCR 자동 인식을 시도할 수 있습니다. (OCR 미연동 시 직접 입력)</div>
+        <div style={{ fontSize: 12, color: C.sub, marginTop: 8 }}>통장사본을 업로드하고 계좌정보를 직접 입력하세요.</div>
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
           <Btn kind="primary" disabled={!ok} onClick={() => onRegistered(acc)}><Check size={14} /> 계좌 등록 완료</Btn>
         </div>
