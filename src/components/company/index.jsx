@@ -88,17 +88,27 @@ function HomeTab({ co, cid, checks, pendingAmend, onAmendClick }) {
 
   const tree = budgetTrees[cid] || [];
 
-  // budgetTree 비목별 집계
+  // budgetTree 비목별 집계 (총사업비는 기준선이므로 제외)
   const bimokGroups = {};
   for (const row of tree) {
+    if (row.bimok === "총사업비") continue;
     if (!bimokGroups[row.bimok]) bimokGroups[row.bimok] = { budget: 0, exec: 0 };
     bimokGroups[row.bimok].budget += row.budget || 0;
     bimokGroups[row.bimok].exec += (row.exec_amt || row.exec || 0);
   }
   const bimokList = Object.entries(bimokGroups);
-  const totB = bimokList.reduce((a, [, v]) => a + v.budget, 0);
+  // 총 예산 = 기업지원비 + 민간현금 + 민간현물 (companies 테이블의 govtFund/cashFund/inkindFund)
+  const totB = (co.govtFund || 0) + (co.cashFund || 0) + (co.inkindFund || 0);
   const totE = bimokList.reduce((a, [, v]) => a + v.exec, 0);
   const totR = rate(totE, totB);
+
+  // 재원별 집행액 (ledger의 fund_source 기준)
+  const { ledgers } = useApp();
+  const ledger = ledgers?.[cid] || [];
+  const fundExec = { 기업지원비: 0, 민간현금: 0, 민간현물: 0 };
+  for (const l of ledger) {
+    if (l.fund_source && fundExec[l.fund_source] !== undefined) fundExec[l.fund_source] += l.amount || 0;
+  }
 
   // budgetTree가 없으면 co.budget/co.exec 사용 (폴백)
   const useFallback = bimokList.length === 0;
@@ -114,10 +124,45 @@ function HomeTab({ co, cid, checks, pendingAmend, onAmendClick }) {
       협약변경 신청 <b>{pendingAmend}건</b>이 검토 중입니다. 승인 시 사업비·기간이 자동 반영됩니다. <button onClick={onAmendClick} style={{ background: "none", border: "none", color: C.blue, fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}>협약변경 보기</button>
     </div>}
     <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 14 }}>
-      <Kpi label="총 사업비" value={useFallback ? `${eok(fb)}` : (totB / 100000000).toFixed(2)} unit="억원" sub={`${useFallback ? won(fb) : totB.toLocaleString()}원`} accent={C.blue} />
-      <Kpi label="집행액" value={useFallback ? `${eok(fe)}` : (totE / 100000000).toFixed(2)} unit="억원" sub={`집행률 ${dispR}%`} accent={C.green} />
-      <Kpi label="집행 잔액" value={useFallback ? `${eok(fb - fe)}` : ((totB - totE) / 100000000).toFixed(2)} unit="억원" sub={`${useFallback ? won(fb - fe) : (totB - totE).toLocaleString()}원`} accent={C.gray} />
+      <Kpi label="총사업비" value={(totB / 100000000).toFixed(2)} unit="억원" sub={`${totB.toLocaleString()}원`} accent={C.navy} />
+      <Kpi label="기업지원비" value={((co.govtFund || 0) / 100000000).toFixed(2)} unit="억원" sub={`${(co.govtFund || 0).toLocaleString()}원`} accent={C.blue} />
+      <Kpi label="민간부담금(현금)" value={((co.cashFund || 0) / 100000000).toFixed(2)} unit="억원" sub={`${(co.cashFund || 0).toLocaleString()}원`} accent={C.green} />
+      <Kpi label="민간부담금(현물)" value={((co.inkindFund || 0) / 100000000).toFixed(2)} unit="억원" sub={`${(co.inkindFund || 0).toLocaleString()}원`} accent={C.amber} />
+    </div>
+
+    {/* 재원별 집행 현황 */}
+    {totB > 0 && <Panel title="재원별 집행 현황" pad={false}>
+      <TableWrap>
+        <thead><tr>{["재원", "예산(원)", "집행(원)", "잔액(원)", "집행률"].map((h, i) => <th key={h} style={th(i ? "right" : "left")}>{h}</th>)}</tr></thead>
+        <tbody>
+          {[
+            { f: "기업지원비", b: co.govtFund || 0, e: fundExec.기업지원비, c: C.blue },
+            { f: "민간부담금(현금)", b: co.cashFund || 0, e: fundExec.민간현금, c: C.green },
+            { f: "민간부담금(현물)", b: co.inkindFund || 0, e: fundExec.민간현물, c: C.amber },
+          ].map((r) => {
+            const rem = r.b - r.e, pct = rate(r.e, r.b);
+            return <tr key={r.f}>
+              <td style={td()}><Tag text={r.f} color={r.c} /></td>
+              <td style={{ ...td("right"), ...numCell, fontWeight: 700 }}>{r.b.toLocaleString()}</td>
+              <td style={{ ...td("right"), ...numCell, fontWeight: 700, color: r.e > r.b ? C.red : C.text }}>{r.e.toLocaleString()}</td>
+              <td style={{ ...td("right"), ...numCell, color: rem < 0 ? C.red : C.sub }}>{rem.toLocaleString()}</td>
+              <td style={{ ...td("right"), ...numCell, fontWeight: 700 }}>{pct}%</td>
+            </tr>;
+          })}
+          <tr style={{ background: C.navy }}>
+            <td style={{ ...td(), color: "#fff", fontWeight: 800 }}>총사업비</td>
+            <td style={{ ...td("right"), ...numCell, color: "#fff", fontWeight: 800 }}>{totB.toLocaleString()}</td>
+            <td style={{ ...td("right"), ...numCell, color: "#fff", fontWeight: 800 }}>{totE.toLocaleString()}</td>
+            <td style={{ ...td("right"), ...numCell, color: "#fff", fontWeight: 800 }}>{(totB - totE).toLocaleString()}</td>
+            <td style={{ ...td("right"), ...numCell, color: "#fff", fontWeight: 800 }}>{totR}%</td>
+          </tr>
+        </tbody>
+      </TableWrap>
+    </Panel>}
+
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
       <Kpi label="점검 지적" value={`${checks.length}`} unit="건" sub={`위험 ${checks.filter((c) => c.sev === "high").length}건`} accent={checks.length ? C.red : C.green} />
+      <Kpi label="협약변경 검토중" value={pendingAmend} unit="건" sub="협약변경 메뉴에서 확인" accent={pendingAmend ? C.amber : C.gray} />
     </div>
     <Panel title="비목별 집행 현황" pad={false}>
       <TableWrap>
@@ -1085,11 +1130,12 @@ export function LedgerSheet({ companyId }) {
 
 export function ManualForm({ companyId, onAdd }) {
   const { addLedgerEntries } = useApp();
-  const [f, setF] = useState({ date: "2026-05-29", type: "세금계산서", bimok: "연구재료비", vendor: "", amount: "" });
+  const [f, setF] = useState({ date: "2026-05-29", type: "세금계산서", bimok: "연구재료비", vendor: "", amount: "", fundSource: "" });
   const [file, setFile] = useState(false);
   const [bulk, setBulk] = useState([]);
   const [busy, setBusy] = useState(false);
-  const ok = f.vendor && f.amount && !busy;
+  const [errMsg, setErrMsg] = useState("");
+  const ok = f.vendor && f.amount && f.fundSource && !busy;
   const row = { display: "grid", gridTemplateColumns: "120px 1fr", borderBottom: `1px solid ${C.lineSoft}` };
   const lbl = { background: "#F8F9FB", padding: "11px 14px", fontSize: 12.5, fontWeight: 700, color: C.text, display: "flex", alignItems: "center", borderRight: `1px solid ${C.lineSoft}` };
   const cell = { padding: "9px 14px", display: "flex", alignItems: "center" };
@@ -1126,15 +1172,30 @@ export function ManualForm({ companyId, onAdd }) {
       <div style={row}><div style={lbl}>집행일자</div><div style={cell}><input type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} style={inp} /></div></div>
       <div style={row}><div style={lbl}>집행구분</div><div style={cell}><select value={f.type} onChange={(e) => setF({ ...f, type: e.target.value })} style={inp}><option>세금계산서</option><option>계좌이체</option><option>인건비 이체</option></select></div></div>
       <div style={row}><div style={lbl}>비목</div><div style={cell}><select value={f.bimok} onChange={(e) => setF({ ...f, bimok: e.target.value })} style={inp}>{BIMOK.map((b) => <option key={b.key}>{b.key}</option>)}</select></div></div>
+      <div style={row}><div style={{ ...lbl, color: C.red }}>재원 *</div><div style={cell}>
+        <select value={f.fundSource} onChange={(e) => setF({ ...f, fundSource: e.target.value })} style={{ ...inp, borderColor: f.fundSource ? C.line : C.red, fontWeight: 700 }}>
+          <option value="">(선택)</option>
+          <option value="기업지원비">기업지원비</option>
+          <option value="민간현금">민간부담금(현금)</option>
+          <option value="민간현물">민간부담금(현물)</option>
+        </select>
+      </div></div>
       <div style={row}><div style={lbl}>거래처</div><div style={cell}><input value={f.vendor} onChange={(e) => setF({ ...f, vendor: e.target.value })} placeholder="(주)○○테크" style={wide} /></div></div>
       <div style={row}><div style={lbl}>집행금액(원)</div><div style={cell}><input value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value.replace(/[^0-9]/g, "") })} placeholder="0" style={{ ...wide, textAlign: "right" }} /></div></div>
       <div style={{ ...row, borderBottom: "none" }}><div style={lbl}>증빙</div><div style={cell}><Btn kind="default" onClick={() => setFile(!file)}>{file ? "첨부됨 ✓" : <><Paperclip size={13} /> 파일 첨부</>}</Btn></div></div>
     </div>
+    {errMsg && <div style={{ marginTop: 10, padding: "10px 14px", background: C.redLt, border: `1px solid ${C.red}55`, borderRadius: 4, fontSize: 12.5, color: C.red, fontWeight: 600 }}>{errMsg}</div>}
     <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}><Btn kind="primary" disabled={!ok} onClick={async () => {
       setBusy(true);
-      await addLedgerEntries(companyId, [{ date: f.date, description: `[${f.type}] ${f.vendor}`, payee: f.vendor, amount: Number(f.amount), bimok: f.bimok, fund: "국비", reg: "직접등록" }]);
-      onAdd("집행내역이 등록되었습니다.");
-      setF({ ...f, vendor: "", amount: "" }); setBusy(false);
+      setErrMsg("");
+      try {
+        await addLedgerEntries(companyId, [{ date: f.date, description: `[${f.type}] ${f.vendor}`, payee: f.vendor, amount: Number(f.amount), bimok: f.bimok, fund: "국비", reg: "직접등록", fund_source: f.fundSource }]);
+        onAdd("집행내역이 등록되었습니다.");
+        setF({ ...f, vendor: "", amount: "", fundSource: "" });
+      } catch (e) {
+        setErrMsg(e.message || "등록 실패");
+      }
+      setBusy(false);
     }}>{busy ? "등록 중..." : "집행 등록"}</Btn></div>
   </>;
 }

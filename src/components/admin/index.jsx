@@ -82,7 +82,7 @@ export function IssueBoard() {
   const [bulk, setBulk] = useState([]);
   const [toast, setToast] = useState("");
   const [busy, setBusy] = useState(false);
-  const [f, setF] = useState({ name: "", announce: "", task: "", pm: "", consortium: "", role: "주관", email: "", start: "2026-06-01", end: "2027-05-31", totalBudget: "" });
+  const [f, setF] = useState({ name: "", announce: "", task: "", pm: "", consortium: "", role: "주관", email: "", start: "2026-06-01", end: "2027-05-31", govtFund: "", cashFund: "", inkindFund: "" });
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(""), 3500); return () => clearTimeout(t); } }, [toast]);
 
   const issued = companies.filter((c) => c.status === "초기등록");
@@ -104,16 +104,18 @@ export function IssueBoard() {
 
   const doIssue = async (item) => {
     const id = getNextGBId(companies);
-    const budget = Object.fromEntries(BIMOK.map((b) => [b.key, 0]));
-    budget[BIMOK[0].key] = item.totalBudget;
+    const govt = Number(item.govtFund) || 0, cash = Number(item.cashFund) || 0, inkind = Number(item.inkindFund) || 0;
+    const total = govt + cash + inkind;
+    const budget = { 총사업비: total };
     await issueProject({
       id, name: item.name, announce: item.announce, task: item.task, pm: item.pm,
       period: `${item.start} ~ ${item.end}`, status: "초기등록",
-      consortium: item.consortium, consortiumRole: item.role || "주관", budget, exec: Object.fromEntries(BIMOK.map((b) => [b.key, 0])),
+      consortium: item.consortium, consortiumRole: item.role || "주관",
+      budget, exec: { 총사업비: 0 },
       researchers: [], email: item.email, inviteEmail: item.email,
+      govtFund: govt, cashFund: cash, inkindFund: inkind,
     });
-    const treeRows = [{ bimok: "총사업비", semok: "총사업비", sse: "총사업비", gwamok: "총사업비", budget: item.totalBudget, exec_amt: 0 }];
-    await updateBudgetTree(id, treeRows);
+    // 서버에서 자동으로 budget_tree에 재원별 총사업비 row 삽입함
     return id;
   };
 
@@ -127,15 +129,21 @@ export function IssueBoard() {
 
   const issueSingle = async () => {
     setBusy(true);
-    const id = await doIssue({ ...f, totalBudget: Number(String(f.totalBudget).replace(/[^0-9]/g, "")) || 0 });
+    const id = await doIssue({
+      ...f,
+      govtFund: Number(String(f.govtFund).replace(/[^0-9]/g, "")) || 0,
+      cashFund: Number(String(f.cashFund).replace(/[^0-9]/g, "")) || 0,
+      inkindFund: Number(String(f.inkindFund).replace(/[^0-9]/g, "")) || 0,
+    });
     setToast(`${id} 과제가 발급되었습니다.`);
-    setF({ name: "", announce: "", task: "", pm: "", consortium: "", email: "", start: "2026-06-01", end: "2027-05-31", totalBudget: "" });
+    setF({ name: "", announce: "", task: "", pm: "", consortium: "", role: "주관", email: "", start: "2026-06-01", end: "2027-05-31", govtFund: "", cashFund: "", inkindFund: "" });
     setBusy(false);
   };
 
   const removeItem = (i) => setBulk(bulk.filter((_, idx) => idx !== i));
-  const bulkTotal = bulk.reduce((a, b) => a + b.totalBudget, 0);
-  const singleOk = f.name && f.task && f.pm && f.totalBudget && !busy;
+  const bulkTotal = bulk.reduce((a, b) => a + ((Number(b.govtFund) || 0) + (Number(b.cashFund) || 0) + (Number(b.inkindFund) || 0)), 0);
+  const fSum = (Number(String(f.govtFund).replace(/[^0-9]/g, "")) || 0) + (Number(String(f.cashFund).replace(/[^0-9]/g, "")) || 0) + (Number(String(f.inkindFund).replace(/[^0-9]/g, "")) || 0);
+  const singleOk = f.name && f.task && f.pm && fSum > 0 && !busy;
 
   const lbl = { background: "#F8F9FB", padding: "10px 14px", fontSize: 12.5, fontWeight: 700, color: C.text, borderRight: `1px solid ${C.lineSoft}`, display: "flex", alignItems: "center" };
   const row = { display: "grid", gridTemplateColumns: "120px 1fr", borderBottom: `1px solid ${C.lineSoft}` };
@@ -216,7 +224,10 @@ export function IssueBoard() {
           </div></div>
           <div style={row}><div style={lbl}>담당자 이메일</div><div style={cell}><input value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} placeholder="가입 시 자동 매칭됩니다" style={wide} /></div></div>
           <div style={row}><div style={lbl}>협약기간</div><div style={cell}><input type="date" value={f.start} onChange={(e) => setF({ ...f, start: e.target.value })} style={inp} /> ~ <input type="date" value={f.end} onChange={(e) => setF({ ...f, end: e.target.value })} style={inp} /></div></div>
-          <div style={{ ...row, borderBottom: "none" }}><div style={lbl}>총사업비(원)</div><div style={cell}><input value={f.totalBudget ? Number(String(f.totalBudget).replace(/[^0-9]/g, "")).toLocaleString() : ""} onChange={(e) => setF({ ...f, totalBudget: e.target.value.replace(/[^0-9]/g, "") })} placeholder="0" style={{ ...inp, width: 200, textAlign: "right", ...numCell }} /></div></div>
+          <div style={row}><div style={lbl}>기업지원비(원)</div><div style={cell}><input value={f.govtFund ? Number(String(f.govtFund).replace(/[^0-9]/g, "")).toLocaleString() : ""} onChange={(e) => setF({ ...f, govtFund: e.target.value.replace(/[^0-9]/g, "") })} placeholder="0" style={{ ...inp, width: 200, textAlign: "right", ...numCell }} /></div></div>
+          <div style={row}><div style={lbl}>민간부담금(현금)</div><div style={cell}><input value={f.cashFund ? Number(String(f.cashFund).replace(/[^0-9]/g, "")).toLocaleString() : ""} onChange={(e) => setF({ ...f, cashFund: e.target.value.replace(/[^0-9]/g, "") })} placeholder="0" style={{ ...inp, width: 200, textAlign: "right", ...numCell }} /></div></div>
+          <div style={row}><div style={lbl}>민간부담금(현물)</div><div style={cell}><input value={f.inkindFund ? Number(String(f.inkindFund).replace(/[^0-9]/g, "")).toLocaleString() : ""} onChange={(e) => setF({ ...f, inkindFund: e.target.value.replace(/[^0-9]/g, "") })} placeholder="0" style={{ ...inp, width: 200, textAlign: "right", ...numCell }} /></div></div>
+          <div style={{ ...row, borderBottom: "none" }}><div style={lbl}>총사업비(자동)</div><div style={cell}><div style={{ ...inp, width: 200, textAlign: "right", ...numCell, background: "#F8F9FB", fontWeight: 800, color: C.navy }}>{fSum.toLocaleString()}</div></div></div>
         </div>
       </Panel>
       <div style={{ display: "flex", justifyContent: "flex-end" }}>

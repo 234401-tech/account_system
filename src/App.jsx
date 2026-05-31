@@ -9,6 +9,7 @@ import { AuditorApp } from "./components/auditor/index.jsx";
 import { LoginPage } from "./components/auth/LoginPage.jsx";
 import { PolicyMockup } from "./components/company/PolicyMockup.jsx";
 import { AmendBudgetMockup } from "./components/company/AmendBudgetMockup.jsx";
+import { FundingMockup } from "./components/company/FundingMockup.jsx";
 import { api } from "./api/index.js";
 
 const notifIcon = { amend: FileText, signup: Users, exec: CreditCard, audit: ClipboardList };
@@ -153,6 +154,7 @@ function Layout() {
 
   if (window.location.hash === "#policy-mockup") return <PolicyMockup />;
   if (window.location.hash === "#amend-budget-mockup") return <AmendBudgetMockup />;
+  if (window.location.hash === "#funding-mockup") return <FundingMockup />;
   if (!user) return <LoginPage />;
 
   const companyId = user.role === "company"

@@ -18,5 +18,10 @@ addCol("companies", "group_id", "TEXT");
 addCol("companies", "bank_name", "TEXT");
 addCol("companies", "bank_account", "TEXT");
 addCol("companies", "bank_holder", "TEXT");
+addCol("companies", "govt_fund", "INTEGER DEFAULT 0");
+addCol("companies", "cash_fund", "INTEGER DEFAULT 0");
+addCol("companies", "inkind_fund", "INTEGER DEFAULT 0");
+addCol("budget_tree", "fund_source", "TEXT");
+addCol("ledger", "fund_source", "TEXT");
 
 console.log("마이그레이션 완료");
