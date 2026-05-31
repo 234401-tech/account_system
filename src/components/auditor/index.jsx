@@ -219,7 +219,25 @@ function AuditorReviewDetail({ coId, companies, onClose }) {
 
   return <>
     <PageHead title={<span>사업비 검토 — {co.name} <span style={{ fontSize: 14, color: C.sub, fontWeight: 500 }}>{co.id}</span></span>} actions={
-      <Btn kind="default" sm onClick={onClose}><X size={13} /> 목록</Btn>
+      <div style={{ display: "flex", gap: 7 }}>
+        <Btn kind="default" sm onClick={() => {
+          const getEx = (r) => r.exec_amt || r.exec || 0;
+          downloadXlsx(`예산현황_${co.name}.xlsx`, [["비목", "세목", "세세목", "예산(원)", "집행(원)", "잔액(원)", "집행률(%)"], ...tree.map((r) => [r.bimok, r.semok, r.sse, r.budget, getEx(r), (r.budget || 0) - getEx(r), rate(getEx(r), r.budget)])]);
+        }}><Download size={13} /> 예산현황</Btn>
+        <Btn kind="default" sm onClick={() => {
+          downloadXlsx(`집행현황_${co.name}.xlsx`, [["비목", "전표일자", "집행내역", "지급처", "세목", "집행액(원)", "증빙"], ...ledgerRows.map((r) => [SEMOK_TO_BIMOK[r.bimok] || r.bimok, r.date, r.desc, r.payee, r.bimok, r.amount, r.evidence_status || "미첨부"])]);
+        }}><Download size={13} /> 집행현황</Btn>
+        <Btn kind="default" sm onClick={async () => {
+          const filesAll = ledgerRows.flatMap((r) => (r.evidenceFiles || []).map((f) => f));
+          if (filesAll.length === 0) return alert("다운로드할 첨부파일이 없습니다.");
+          const JSZip = (await import("jszip")).default;
+          const { saveAs } = await import("file-saver");
+          const zip = new JSZip();
+          for (const f of filesAll) { try { const res = await fetch(`/uploads/${f.filename}`); if (res.ok) zip.file(f.original_name || f.filename, await res.blob()); } catch {} }
+          saveAs(await zip.generateAsync({ type: "blob" }), `증빙_${co.name}.zip`);
+        }}><Download size={13} /> 첨부파일</Btn>
+        <Btn kind="default" sm onClick={onClose}><X size={13} /> 목록</Btn>
+      </div>
     } />
     <InfoBar rows={[["과제명", co.task], ["회사명", co.consortium], ["연구책임자", co.pm], ["협약기간", co.period]]} />
 
