@@ -26,6 +26,8 @@ router.get("/", adminOrMaster, (req, res) => {
 router.post("/", adminOrMaster, (req, res) => {
   const { name, email, password, role, companyId } = req.body;
   if (!name || !email || !password || !role) return res.status(400).json({ error: "필수 항목을 모두 입력하세요" });
+  // 마스터 생성은 마스터만 가능
+  if (role === "master" && req.user.role !== "master") return res.status(403).json({ error: "마스터 관리자 생성은 마스터만 가능합니다" });
   const exists = db.prepare("SELECT 1 FROM users WHERE email = ?").get(email);
   if (exists) return res.status(409).json({ error: "이미 등록된 이메일입니다" });
   const id = `U-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -37,6 +39,10 @@ router.post("/", adminOrMaster, (req, res) => {
 // PUT /api/users/:id — 계정 수정
 router.put("/:id", adminOrMaster, (req, res) => {
   const { name, email, role, companyId, password } = req.body;
+  // 마스터로 승격은 마스터만 가능 / 마스터 계정 수정도 마스터만
+  const target = db.prepare("SELECT role FROM users WHERE id = ?").get(req.params.id);
+  if (role === "master" && req.user.role !== "master") return res.status(403).json({ error: "마스터 관리자 권한 부여는 마스터만 가능합니다" });
+  if (target?.role === "master" && req.user.role !== "master") return res.status(403).json({ error: "마스터 계정은 마스터만 수정할 수 있습니다" });
   if (name) db.prepare("UPDATE users SET name = ? WHERE id = ?").run(name, req.params.id);
   if (email) db.prepare("UPDATE users SET email = ? WHERE id = ?").run(email, req.params.id);
   if (role) db.prepare("UPDATE users SET role = ? WHERE id = ?").run(role, req.params.id);
@@ -48,6 +54,8 @@ router.put("/:id", adminOrMaster, (req, res) => {
 // DELETE /api/users/:id — 계정 삭제
 router.delete("/:id", adminOrMaster, (req, res) => {
   if (req.params.id === req.user.id) return res.status(400).json({ error: "본인 계정은 삭제할 수 없습니다" });
+  const target = db.prepare("SELECT role FROM users WHERE id = ?").get(req.params.id);
+  if (target?.role === "master" && req.user.role !== "master") return res.status(403).json({ error: "마스터 계정은 마스터만 삭제할 수 있습니다" });
   db.prepare("DELETE FROM users WHERE id = ?").run(req.params.id);
   res.json({ ok: true });
 });

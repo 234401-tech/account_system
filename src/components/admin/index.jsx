@@ -5,6 +5,7 @@ import { downloadXlsx, parseXlsx } from "../../lib/xlsx.js";
 import { sum, won, eok, rate } from "../../lib/format.js";
 import { runChecks } from "../../lib/checks.js";
 import { useApp } from "../../context/AppContext.jsx";
+import { useAuth } from "../../context/AuthContext.jsx";
 import { api } from "../../api/index.js";
 import { Shell } from "../common/Shell.jsx";
 import { th, td, numCell, inp, Tag, Status, Btn, Panel, Breadcrumb, PageHead, SearchBox, Field, Kpi, Toast, MiniBar, TableWrap, InfoBar } from "../common/ui.jsx";
@@ -1045,6 +1046,8 @@ const roleLabel = { master: "마스터 관리자", admin: "기관관리자", com
 const roleColor = { master: C.red, admin: C.blue, company: C.teal, auditor: C.amber };
 
 export function UserAdmin() {
+  const { user: currentUser } = useAuth();
+  const isMaster = currentUser?.role === "master";
   const { companies } = useApp();
   const [userTab, setUserTab] = useState("list");
   const [users, setUsers] = useState([]);
@@ -1141,7 +1144,7 @@ export function UserAdmin() {
                       setToast(`${u.name} 역할이 변경되었습니다.`);
                       await loadUsers();
                     }} style={{ ...inp, padding: "3px 8px", fontSize: 12, fontWeight: 700, color: roleColor[u.role], borderColor: roleColor[u.role] }}>
-                    <option value="company">기업</option><option value="admin">기관관리자</option><option value="auditor">회계사</option>
+                    <option value="company">기업</option><option value="admin">기관관리자</option><option value="auditor">회계사</option>{isMaster && <option value="master">마스터 관리자</option>}
                   </select>}</td>
                 <td style={td()}>{u.role === "company"
                   ? <select value={u.company_id || ""} onChange={async (e) => {
@@ -1206,7 +1209,12 @@ export function UserAdmin() {
       <Panel title="계정 생성" sub="관리자가 직접 계정을 생성합니다">
         <div style={{ border: `1px solid ${C.line}`, borderRadius: 4, overflow: "hidden" }}>
           {[
-            ["역할", <select value={newUser.role} onChange={(e) => setNewUser({ ...newUser, role: e.target.value })} style={inp}><option value="company">기업</option><option value="auditor">회계사</option><option value="admin">기관관리자</option><option value="master">마스터 관리자</option></select>],
+            ["역할", <select value={newUser.role} onChange={(e) => setNewUser({ ...newUser, role: e.target.value })} style={inp}>
+              <option value="company">기업</option>
+              <option value="auditor">회계사</option>
+              <option value="admin">기관관리자</option>
+              {isMaster && <option value="master">마스터 관리자</option>}
+            </select>],
             ["이름", <input value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} placeholder="홍길동" style={{ ...inp, width: 200 }} />],
             ["이메일", <input value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} placeholder="user@email.com" style={{ ...inp, width: 300 }} />],
             ["비밀번호", <input type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} placeholder="초기 비밀번호" style={{ ...inp, width: 200 }} />],
