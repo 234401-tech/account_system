@@ -603,8 +603,11 @@ export function BudgetSheet({ companyId }) {
   useEffect(() => { if (serverRows.length && !localRows.length) setLocalRows(serverRows.map((r, i) => ({ ...r, _id: r.id || r._id || "B" + i }))); }, [serverRows]);
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(""), 2600); return () => clearTimeout(t); } }, [toast]);
 
-  const totB = rows.reduce((a, r) => a + (r.budget || 0), 0);
-  const totE = rows.reduce((a, r) => a + (r.exec_amt || r.exec || 0), 0);
+  // 총사업비(기준선)는 별도. 총 예산/집행 계산에서 제외하여 중복 합산 방지
+  const baseTotal = rows.filter((r) => r.bimok === "총사업비").reduce((a, x) => a + (x.budget || 0), 0);
+  const otherTotal = rows.filter((r) => r.bimok !== "총사업비").reduce((a, x) => a + (x.budget || 0), 0);
+  const totB = baseTotal > 0 ? baseTotal : otherTotal; // 총사업비가 있으면 그것이 총 예산
+  const totE = rows.filter((r) => r.bimok !== "총사업비").reduce((a, r) => a + (r.exec_amt || r.exec || 0), 0);
   const set = (id, k, v) => setLocalRows(rows.map((r) => r._id === id ? { ...r, [k]: v } : r));
   const groupKey = (r) => r._group || r.bimok || "";
 
@@ -669,8 +672,6 @@ export function BudgetSheet({ companyId }) {
 
     {/* 총사업비 ↔ 비목 합계 검증 */}
     {(() => {
-      const baseTotal = rows.filter((r) => r.bimok === "총사업비").reduce((a, x) => a + (x.budget || 0), 0);
-      const otherTotal = rows.filter((r) => r.bimok && r.bimok !== "총사업비").reduce((a, x) => a + (x.budget || 0), 0);
       if (baseTotal === 0 || otherTotal === 0) return null;
       const diff = baseTotal - otherTotal;
       if (diff === 0) return (
