@@ -947,10 +947,10 @@ export function SettleView({ co, checks, onSubmit }) {
 }
 
 /* ═══════════ 관리자 ═══════════ */
-export function AccountRegister({ registered, onRegistered }) {
+export function AccountRegister({ registered, onRegistered, initialAcc, displayInfo }) {
   const ref = useRef(null);
   const [file, setFile] = useState(null);
-  const [acc, setAcc] = useState({ bank: "", account: "", holder: "" });
+  const [acc, setAcc] = useState(initialAcc || { bank: "", account: "", holder: "" });
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
@@ -1006,9 +1006,10 @@ export function AccountRegister({ registered, onRegistered }) {
   const cell = { padding: "8px 14px", display: "flex", alignItems: "center" };
 
   if (registered) {
+    const info = displayInfo || acc;
     return <div style={{ background: C.greenLt, border: `1px solid ${C.green}55`, borderRadius: 4, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
       <div style={{ width: 26, height: 26, borderRadius: 999, background: C.green, color: "#fff", display: "grid", placeItems: "center", fontWeight: 800 }}>✓</div>
-      <div style={{ fontSize: 13 }}><b style={{ color: C.green }}>사업비 계좌 등록 완료</b> <span style={{ color: C.text, marginLeft: 8 }}>{acc.bank} {acc.account} {acc.holder && `(예금주 ${acc.holder})`}</span></div>
+      <div style={{ fontSize: 13 }}><b style={{ color: C.green }}>사업비 계좌 등록 완료</b> <span style={{ color: C.text, marginLeft: 8 }}>{info.bank} {info.account} {info.holder && `(예금주 ${info.holder})`}</span></div>
     </div>;
   }
 
@@ -1046,11 +1047,33 @@ export function AccountRegister({ registered, onRegistered }) {
 }
 
 export function InitialRegistration({ co, onDone }) {
+  const STORAGE_KEY = `init-reg-${co.id}`;
   const makeInit = () => [{ id: "R1", name: co.pm || "", role: "연구책임자", position: "책임연구원", rate: 30, period: co.period, salary: true }];
   const makeEmpty = () => [{ id: "R1", name: "", role: "연구책임자", position: "", rate: 0, period: "", salary: true }];
-  const [people, setPeople] = useState(makeInit);
-  const [acct, setAcct] = useState(false);
+
+  // localStorage에서 진행 상태 복원
+  const [people, setPeople] = useState(() => {
+    try { const s = localStorage.getItem(STORAGE_KEY + "-people"); if (s) return JSON.parse(s); } catch {}
+    return makeInit();
+  });
+  const [acct, setAcct] = useState(() => localStorage.getItem(STORAGE_KEY + "-acct") === "true");
+  const [acctInfo, setAcctInfo] = useState(() => {
+    try { const s = localStorage.getItem(STORAGE_KEY + "-acct-info"); if (s) return JSON.parse(s); } catch {}
+    return null;
+  });
   const [acctResetKey, setAcctResetKey] = useState(0);
+
+  // 변경시 localStorage에 저장
+  useEffect(() => { localStorage.setItem(STORAGE_KEY + "-people", JSON.stringify(people)); }, [people]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEY + "-acct", String(acct)); }, [acct]);
+  useEffect(() => { if (acctInfo) localStorage.setItem(STORAGE_KEY + "-acct-info", JSON.stringify(acctInfo)); }, [acctInfo]);
+
+  const clearStorage = () => {
+    localStorage.removeItem(STORAGE_KEY + "-people");
+    localStorage.removeItem(STORAGE_KEY + "-acct");
+    localStorage.removeItem(STORAGE_KEY + "-acct-info");
+  };
+
   const setP = (i, k, v) => setPeople(people.map((p, idx) => idx === i ? { ...p, [k]: v } : p));
   const addP = () => setPeople([...people, { id: "R" + (people.length + 1), name: "", role: "참여연구원", position: "연구원", rate: 0, period: co.period, salary: true }]);
   const delP = (i) => setPeople(people.filter((_, idx) => idx !== i));
@@ -1058,7 +1081,9 @@ export function InitialRegistration({ co, onDone }) {
     if (!confirm("입력한 모든 정보를 초기화하시겠습니까?")) return;
     setPeople(makeEmpty());
     setAcct(false);
+    setAcctInfo(null);
     setAcctResetKey((k) => k + 1);
+    clearStorage();
   };
   const valid = people.some((p) => p.name) && acct;
 
@@ -1101,13 +1126,13 @@ export function InitialRegistration({ co, onDone }) {
     </Panel>
 
     <Panel title="② 사업비 계좌 등록" sub="통장사본 업로드 시 계좌정보 자동 인식(OCR)"
-      extra={acct && <Btn kind="default" sm onClick={() => { setAcct(false); setAcctResetKey((k) => k + 1); }}><RotateCw size={12} /> 재등록</Btn>}>
-      <AccountRegister key={acctResetKey} registered={acct} onRegistered={() => setAcct(true)} />
+      extra={acct && <Btn kind="default" sm onClick={() => { setAcct(false); setAcctInfo(null); setAcctResetKey((k) => k + 1); }}><RotateCw size={12} /> 재등록</Btn>}>
+      <AccountRegister key={acctResetKey} registered={acct} initialAcc={acctInfo} onRegistered={(acc) => { setAcct(true); setAcctInfo(acc); }} displayInfo={acctInfo} />
     </Panel>
 
     <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12 }}>
       {!valid && <span style={{ fontSize: 12.5, color: C.sub }}>참여연구원 1명 이상 등록 및 사업비 계좌 등록을 완료하세요.</span>}
-      <Btn kind="primary" disabled={!valid} onClick={() => onDone(people.filter((p) => p.name))}><Check size={14} /> 초기 등록 완료 · 집행 개시</Btn>
+      <Btn kind="primary" disabled={!valid} onClick={() => { onDone(people.filter((p) => p.name)); clearStorage(); }}><Check size={14} /> 초기 등록 완료 · 집행 개시</Btn>
     </div>
   </>;
 }
