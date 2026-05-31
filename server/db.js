@@ -186,6 +186,18 @@ db.exec(`
     FOREIGN KEY (company_id) REFERENCES companies(id)
   );
 
+  CREATE TABLE IF NOT EXISTS password_reset_requests (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id       TEXT NOT NULL,
+    email         TEXT NOT NULL,
+    name          TEXT,
+    status        TEXT DEFAULT '대기',
+    temp_password TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    processed_at  TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
   CREATE TABLE IF NOT EXISTS notifications (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id     TEXT NOT NULL,

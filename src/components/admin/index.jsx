@@ -1070,9 +1070,13 @@ export function UserAdmin() {
   const [userTab, setUserTab] = useState("list");
   const [users, setUsers] = useState([]);
   const [signups, setSignups] = useState([]);
+  const [resetReqs, setResetReqs] = useState([]);
   const [filter, setFilter] = useState("전체");
   const [toast, setToast] = useState("");
   const [newUser, setNewUser] = useState({ name: "", email: "", password: "", role: "company", companyId: "" });
+  const loadResetReqs = async () => { try { setResetReqs(await api.listResetRequests()); } catch {} };
+  useEffect(() => { loadResetReqs(); }, []);
+  const pendingResets = resetReqs.filter((r) => r.status === "대기").length;
 
   useEffect(() => { loadUsers(); }, []);
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(""), 3000); return () => clearTimeout(t); } }, [toast]);
@@ -1129,7 +1133,7 @@ export function UserAdmin() {
   return <>
     <PageHead title="회원관리" />
     <div style={{ display: "flex", borderBottom: `2px solid ${C.line}`, marginBottom: 14 }}>
-      {[["list", "전체 계정"], ["signup", `가입 승인 (${signups.length})`], ["create", "계정 생성"]].map(([k, l]) => (
+      {[["list", "전체 계정"], ["signup", `가입 승인 (${signups.length})`], ["reset", `비번 재설정 (${pendingResets})`], ["create", "계정 생성"]].map(([k, l]) => (
         <button key={k} onClick={() => setUserTab(k)} style={{ padding: "10px 20px", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700, background: userTab === k ? "#fff" : "transparent", color: userTab === k ? C.blue : C.sub, borderBottom: userTab === k ? `2.5px solid ${C.blue}` : "2.5px solid transparent", marginBottom: -2 }}>{l}</button>
       ))}
     </div>
@@ -1220,6 +1224,48 @@ export function UserAdmin() {
             ))}
           </tbody>
         </TableWrap>}
+      </Panel>
+    </>}
+
+    {userTab === "reset" && <>
+      <Panel title="비밀번호 재설정 요청" sub="기업/회계사가 로그인 화면에서 요청한 비밀번호 재설정 목록" pad={false}>
+        {resetReqs.length === 0 ? (
+          <div style={{ padding: "30px 16px", textAlign: "center", color: C.sub }}>접수된 요청이 없습니다.</div>
+        ) : (
+          <TableWrap>
+            <thead><tr>{["이메일", "이름", "신청일", "상태", "임시 비밀번호", "관리"].map((h) => <th key={h} style={th()}>{h}</th>)}</tr></thead>
+            <tbody>
+              {resetReqs.map((r) => (
+                <tr key={r.id}>
+                  <td style={td()}>{r.email}</td>
+                  <td style={{ ...td(), fontWeight: 700 }}>{r.name || "-"}</td>
+                  <td style={{ ...td(), ...numCell, color: C.sub }}>{(r.created_at || "").slice(0, 16)}</td>
+                  <td style={td()}><Tag text={r.status} color={r.status === "대기" ? C.amber : r.status === "승인" ? C.green : C.red} /></td>
+                  <td style={td()}>
+                    {r.temp_password ? (
+                      <code style={{ background: C.greenLt, padding: "3px 8px", borderRadius: 3, fontSize: 12.5, fontWeight: 700, color: C.green }}>{r.temp_password}</code>
+                    ) : "-"}
+                  </td>
+                  <td style={td()}>
+                    {r.status === "대기" && <div style={{ display: "flex", gap: 4 }}>
+                      <Btn kind="primary" sm onClick={async () => {
+                        try {
+                          const res = await api.approveResetRequest(r.id);
+                          setToast(`승인 완료. 임시 비번: ${res.tempPassword} (사용자에게 전달하세요)`);
+                          loadResetReqs();
+                        } catch (e) { setToast("실패: " + e.message); }
+                      }}><Check size={11} /> 승인 + 임시비번 발급</Btn>
+                      <Btn kind="danger" sm onClick={async () => {
+                        if (!confirm("이 요청을 거부하시겠습니까?")) return;
+                        try { await api.rejectResetRequest(r.id); setToast("거부됨"); loadResetReqs(); } catch (e) { setToast("실패: " + e.message); }
+                      }}>거부</Btn>
+                    </div>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </TableWrap>
+        )}
       </Panel>
     </>}
 

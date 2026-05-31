@@ -75,6 +75,45 @@ router.post("/reset-password", authMiddleware, adminOnly, (req, res) => {
   res.json({ message: "비밀번호가 초기화되었습니다" });
 });
 
+// POST /api/auth/reset-request — 비밀번호 분실 신청 (비로그인)
+router.post("/reset-request", (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: "이메일을 입력하세요" });
+  const user = db.prepare("SELECT id, email, name FROM users WHERE email = ?").get(email);
+  // 보안: 사용자 존재 여부 노출 안 함 (성공으로 처리)
+  if (user) {
+    // 중복 대기 요청 차단
+    const pending = db.prepare("SELECT 1 FROM password_reset_requests WHERE user_id = ? AND status = '대기'").get(user.id);
+    if (!pending) {
+      db.prepare("INSERT INTO password_reset_requests (user_id, email, name) VALUES (?,?,?)").run(user.id, user.email, user.name);
+    }
+  }
+  res.json({ message: "비밀번호 재설정 요청이 접수되었습니다. 관리자 승인 후 임시 비밀번호가 발급됩니다." });
+});
+
+// GET /api/auth/reset-requests — 관리자가 요청 목록 조회
+router.get("/reset-requests", authMiddleware, adminOnly, (_req, res) => {
+  const list = db.prepare("SELECT * FROM password_reset_requests ORDER BY created_at DESC").all();
+  res.json(list);
+});
+
+// POST /api/auth/reset-requests/:id/approve — 관리자 승인 → 임시 비번 발급
+router.post("/reset-requests/:id/approve", authMiddleware, adminOnly, (req, res) => {
+  const reqRow = db.prepare("SELECT * FROM password_reset_requests WHERE id = ?").get(req.params.id);
+  if (!reqRow) return res.status(404).json({ error: "요청을 찾을 수 없습니다" });
+  if (reqRow.status !== "대기") return res.status(400).json({ error: "이미 처리된 요청입니다" });
+  const tempPw = Math.random().toString(36).slice(-8) + "!";
+  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(bcrypt.hashSync(tempPw, 10), reqRow.user_id);
+  db.prepare("UPDATE password_reset_requests SET status = '승인', temp_password = ?, processed_at = datetime('now') WHERE id = ?").run(tempPw, req.params.id);
+  res.json({ tempPassword: tempPw, email: reqRow.email });
+});
+
+// POST /api/auth/reset-requests/:id/reject — 관리자 거부
+router.post("/reset-requests/:id/reject", authMiddleware, adminOnly, (req, res) => {
+  db.prepare("UPDATE password_reset_requests SET status = '거부', processed_at = datetime('now') WHERE id = ?").run(req.params.id);
+  res.json({ ok: true });
+});
+
 // POST /api/auth/signup
 router.post("/signup", (req, res) => {
   const { bizNo, companyName, contactName, email, password } = req.body;
