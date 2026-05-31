@@ -355,8 +355,40 @@ export function ImpactNote({ a: rawA, co }) {
 }
 
 export function AdminDash({ onPick }) {
-  const { companies } = useApp();
-  const tB = companies.reduce((a, c) => a + sum(c.budget), 0), tE = companies.reduce((a, c) => a + sum(c.exec), 0);
+  const { companies, budgetTrees, ledgers, loadBudgetTree, loadLedger } = useApp();
+
+  // 모든 과제의 budget_tree와 ledger를 로드
+  useEffect(() => {
+    for (const c of companies) {
+      loadBudgetTree(c.id);
+      loadLedger(c.id);
+    }
+  }, [companies.length]);
+
+  // 비목별 동적 집계 (총사업비 제외)
+  const bimokAgg = {};
+  for (const c of companies) {
+    const tree = budgetTrees[c.id] || [];
+    for (const r of tree) {
+      if (!r.bimok || r.bimok === "총사업비") continue;
+      if (!bimokAgg[r.bimok]) bimokAgg[r.bimok] = { budget: 0, exec: 0 };
+      bimokAgg[r.bimok].budget += r.budget || 0;
+    }
+    const ledger = ledgers[c.id] || [];
+    for (const l of ledger) {
+      if (!l.bimok) continue;
+      // ledger의 bimok이 세목일 수도 비목일 수도. 둘 다 시도
+      const bm = bimokAgg[l.bimok] ? l.bimok : Object.keys(bimokAgg).find((k) => k === l.bimok);
+      if (bm && bimokAgg[bm]) bimokAgg[bm].exec += l.amount || 0;
+    }
+  }
+  const bimokList = Object.entries(bimokAgg).sort(([a], [b]) => {
+    const ia = BIMOK_ORDER.indexOf(a), ib = BIMOK_ORDER.indexOf(b);
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+  });
+
+  const tB = bimokList.reduce((a, [, v]) => a + v.budget, 0);
+  const tE = bimokList.reduce((a, [, v]) => a + v.exec, 0);
   const all = companies.flatMap((c) => runChecks(c).map((f) => ({ ...f, c })));
   const high = all.filter((c) => c.sev === "high");
   return <>
@@ -367,17 +399,27 @@ export function AdminDash({ onPick }) {
       <Kpi label="집행률" value={rate(tE, tB)} unit="%" sub={`${eok(tE)}억원 집행`} accent={C.green} />
       <Kpi label="점검 적발(위험)" value={high.length} unit="건" sub={`전체 ${all.length}건`} accent={C.red} />
     </div>
-    <Panel title="비목별 예산 대비 집행" sub="(단위: 원)" pad={false}>
+    <Panel title="비목별 예산 대비 집행" sub={`(단위: 원) · 전체 ${companies.length}개 과제 합산`} pad={false}>
       <TableWrap>
         <thead><tr>{["비목", "예산(원)", "집행(원)", "집행률", "예산 대비 집행"].map((h, i) => <th key={h} style={th(i >= 1 && i <= 3 ? "right" : "left")}>{h}</th>)}</tr></thead>
-        <tbody>{BIMOK.map((bm) => {
-          const b = companies.reduce((a, c) => a + (c.budget[bm.key] || 0), 0), e = companies.reduce((a, c) => a + (c.exec[bm.key] || 0), 0), r = rate(e, b);
-          return <tr key={bm.key}><td style={{ ...td(), fontWeight: 600 }}>{bm.key}</td>
-            <td style={{ ...td("right"), ...numCell }}>{b.toLocaleString()}</td>
-            <td style={{ ...td("right"), ...numCell, fontWeight: 700 }}>{e.toLocaleString()}</td>
-            <td style={{ ...td("right"), ...numCell, fontWeight: 700, color: r > 100 ? C.red : C.text }}>{r}%</td>
-            <td style={td()}><div style={{ width: "100%", height: 8, background: C.lineSoft, borderRadius: 2 }}><div style={{ width: `${Math.min(r, 100)}%`, height: "100%", background: r > 100 ? C.red : C.blue, borderRadius: 2 }} /></div></td></tr>;
-        })}</tbody>
+        <tbody>
+          {bimokList.length === 0 && <tr><td colSpan={5} style={{ ...td(), textAlign: "center", color: C.sub, padding: "20px 0" }}>등록된 비목이 없습니다. 기업이 예산 편성 시 표시됩니다.</td></tr>}
+          {bimokList.map(([bm, v]) => {
+            const r = rate(v.exec, v.budget);
+            return <tr key={bm}><td style={{ ...td(), fontWeight: 600 }}>{bm}</td>
+              <td style={{ ...td("right"), ...numCell }}>{v.budget.toLocaleString()}</td>
+              <td style={{ ...td("right"), ...numCell, fontWeight: 700 }}>{v.exec.toLocaleString()}</td>
+              <td style={{ ...td("right"), ...numCell, fontWeight: 700, color: r > 100 ? C.red : C.text }}>{r}%</td>
+              <td style={td()}><div style={{ width: "100%", height: 8, background: C.lineSoft, borderRadius: 2 }}><div style={{ width: `${Math.min(r, 100)}%`, height: "100%", background: r > 100 ? C.red : C.blue, borderRadius: 2 }} /></div></td></tr>;
+          })}
+          {bimokList.length > 0 && <tr style={{ background: C.navy }}>
+            <td style={{ ...td(), color: "#fff", fontWeight: 800 }}>합 계</td>
+            <td style={{ ...td("right"), ...numCell, color: "#fff", fontWeight: 800 }}>{tB.toLocaleString()}</td>
+            <td style={{ ...td("right"), ...numCell, color: "#fff", fontWeight: 800 }}>{tE.toLocaleString()}</td>
+            <td style={{ ...td("right"), ...numCell, color: "#fff", fontWeight: 800 }}>{rate(tE, tB)}%</td>
+            <td style={{ ...td(), background: C.navy }} />
+          </tr>}
+        </tbody>
       </TableWrap>
     </Panel>
     <Panel title="자동 집행점검 적발" sub="집행내역·규정 기반 점검" pad={false}>
