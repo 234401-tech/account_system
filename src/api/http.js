@@ -42,10 +42,12 @@ export const reviewEvidence = (txnId) => http_post(`/api/ledger/${txnId}/evidenc
 // --- 협약변경 ---
 export const listAmendments = () => http_get("/api/amendments");
 export const submitAmendment = (a) => {
-  const { id, companyId, company, type, reason, before, after, periodBefore, periodAfter, researchersBefore, researchersAfter, ...rest } = a;
+  const { id, companyId, company, type, reason, before, after, periodBefore, periodAfter, researchersBefore, researchersAfter, treeBefore, treeAfter, ...rest } = a;
   const detail = {};
   if (before) detail.before = before;
   if (after) detail.after = after;
+  if (treeBefore) detail.treeBefore = treeBefore;
+  if (treeAfter) detail.treeAfter = treeAfter;
   if (periodBefore) detail.periodBefore = periodBefore;
   if (periodAfter) detail.periodAfter = periodAfter;
   if (researchersBefore) detail.researchersBefore = researchersBefore;

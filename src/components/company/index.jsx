@@ -370,25 +370,53 @@ export function CompanyAmend({ co, amends, onSubmit }) {
 export function AmendForm({ co, onSubmit, onFilesUploaded, initType }) {
   const { budgetTrees, loadBudgetTree } = useApp();
   const [type, setType] = useState(initType || "사업비 변경");
-  const [after, setAfter] = useState({ ...co.budget });
   const [periodAfter, setPeriodAfter] = useState(co.period);
   const [people, setPeople] = useState(co.researchers.map((r) => ({ ...r })));
   const [reason, setReason] = useState("");
 
-  // 사용자가 편성한 실제 비목 목록 가져오기 (총사업비 제외)
+  // 비목/세목 트리 — 변경 전(treeBefore) + 변경 후(treeAfter)
   useEffect(() => { if (co.id) loadBudgetTree(co.id); }, [co.id, loadBudgetTree]);
-  const tree = budgetTrees[co.id] || [];
-  const bimokTotals = {};
-  for (const r of tree) {
-    if (!r.bimok || r.bimok === "총사업비") continue;
-    bimokTotals[r.bimok] = (bimokTotals[r.bimok] || 0) + (r.budget || 0);
-  }
-  const bimokList = Object.keys(bimokTotals).length > 0
-    ? Object.keys(bimokTotals).sort((a, b) => { const ia = BIMOK_ORDER.indexOf(a), ib = BIMOK_ORDER.indexOf(b); return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib); })
-    : BIMOK_ORDER;
-  const getCurrent = (bm) => bimokTotals[bm] !== undefined ? bimokTotals[bm] : (co.budget?.[bm] || 0);
-  const tb = bimokList.reduce((a, bm) => a + getCurrent(bm), 0);
-  const ta = bimokList.reduce((a, bm) => a + (after[bm] || 0), 0);
+  const treeBefore = budgetTrees[co.id] || [];
+  const [treeAfter, setTreeAfter] = useState([]);
+  useEffect(() => {
+    if (treeBefore.length > 0 && treeAfter.length === 0) {
+      setTreeAfter(treeBefore.map((r, i) => ({ ...r, _id: r.id ? "T" + r.id : "T" + i, _origBudget: r.budget || 0 })));
+    }
+  }, [treeBefore]);
+
+  // 트리 조작
+  const groupKey = (r) => r._group || r.bimok || "";
+  const setAfterRow = (id, k, v) => setTreeAfter(treeAfter.map((r) => r._id === id ? { ...r, [k]: v } : r));
+  const setBimokName = (gk, name) => setTreeAfter(treeAfter.map((r) => groupKey(r) === gk ? { ...r, bimok: name } : r));
+  const addBimok = () => {
+    const gk = "G" + Date.now();
+    setTreeAfter([...treeAfter, { _id: "T" + Date.now(), _group: gk, bimok: "", semok: "", sse: "", budget: 0, _origBudget: 0 }]);
+  };
+  const addSemok = (gk) => {
+    const ref = treeAfter.find((r) => groupKey(r) === gk);
+    if (!ref) return;
+    setTreeAfter([...treeAfter, { _id: "T" + Date.now(), _group: ref._group, bimok: ref.bimok, semok: "", sse: "", budget: 0, _origBudget: 0 }]);
+  };
+  const delRow = (id) => setTreeAfter(treeAfter.filter((r) => r._id !== id));
+  const delBimok = (gk) => { if (confirm("이 비목 전체를 삭제하시겠습니까?")) setTreeAfter(treeAfter.filter((r) => groupKey(r) !== gk)); };
+
+  // 그룹화 (트리)
+  const groupsMap = treeAfter.reduce((a, r) => {
+    const gk = groupKey(r);
+    if (!a[gk]) a[gk] = { bimok: r.bimok || "", items: [] };
+    a[gk].items.push(r);
+    return a;
+  }, {});
+  const groups = Object.entries(groupsMap).sort(([_, ga], [__, gb]) => {
+    const ia = BIMOK_ORDER.indexOf(ga.bimok), ib = BIMOK_ORDER.indexOf(gb.bimok);
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+  });
+
+  // 검증
+  const baseAfter = treeAfter.filter((r) => r.bimok === "총사업비").reduce((a, x) => a + (x.budget || 0), 0);
+  const otherBefore = treeAfter.filter((r) => r.bimok !== "총사업비").reduce((a, x) => a + (x._origBudget || 0), 0);
+  const otherAfter = treeAfter.filter((r) => r.bimok !== "총사업비").reduce((a, x) => a + (x.budget || 0), 0);
+  const validDiff = baseAfter - otherAfter;
   const lbl = { background: "#F8F9FB", padding: "11px 14px", fontSize: 12.5, fontWeight: 700, color: C.text, borderRight: `1px solid ${C.lineSoft}`, display: "flex", alignItems: "center" };
   const row = { display: "grid", gridTemplateColumns: "120px 1fr", borderBottom: `1px solid ${C.lineSoft}` };
   const cell = { padding: "9px 14px", display: "flex", alignItems: "center", gap: 8 };
@@ -413,7 +441,16 @@ export function AmendForm({ co, onSubmit, onFilesUploaded, initType }) {
     const submittedAt = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     const base = { id, companyId: co.id, company: co.name, type, reason: reason || "(사유 미입력)", submittedAt, status: "검토중", reviewComment: "", attachments: [] };
     let amend;
-    if (type === "사업비 변경") amend = { ...base, before: { ...co.budget }, after: { ...after } };
+    if (type === "사업비 변경") {
+      // 트리에서 비목별 합산 (총사업비 제외)
+      const beforeBM = {}, afterBM = {};
+      for (const r of treeAfter) {
+        if (!r.bimok || r.bimok === "총사업비") continue;
+        beforeBM[r.bimok] = (beforeBM[r.bimok] || 0) + (r._origBudget || 0);
+        afterBM[r.bimok] = (afterBM[r.bimok] || 0) + (r.budget || 0);
+      }
+      amend = { ...base, before: beforeBM, after: afterBM, treeBefore: treeBefore.map(({ id, bimok, semok, sse, budget }) => ({ id, bimok, semok, sse, budget })), treeAfter: treeAfter.map(({ _id, _group, _origBudget, ...r }) => r) };
+    }
     else if (type === "연구기간 변경") amend = { ...base, periodBefore: co.period, periodAfter };
     else if (type === "신규인력 추가" || type === "참여연구원 변경" || type === "참여율 변경") amend = { ...base, researchersBefore: co.researchers, researchersAfter: people.filter((p) => !p._removed).map(({ _new, _removed, ...r }) => r) };
 
@@ -432,30 +469,84 @@ export function AmendForm({ co, onSubmit, onFilesUploaded, initType }) {
       <div style={{ ...row, borderBottom: "none" }}><div style={lbl}>변경사유</div><div style={cell}><input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="변경 사유를 입력하세요" style={{ ...inp, width: "100%", maxWidth: 480 }} /></div></div>
     </div>
 
-    {type === "사업비 변경" ? (
-      <Panel title="비목별 사업비 변경(안)" sub="변경 후 금액을 입력하세요 (원 단위)" pad={false}>
+    {type === "사업비 변경" ? <>
+      {/* 검증 박스 */}
+      {baseAfter > 0 && otherAfter > 0 && (validDiff !== 0 ? (
+        <div style={{ background: C.redLt, border: `1px solid ${C.red}55`, borderRadius: 4, padding: "12px 16px", marginBottom: 14, fontSize: 13 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <Info size={15} style={{ color: C.red }} /><b style={{ color: C.red }}>총사업비와 비목 합계가 일치하지 않습니다</b>
+          </div>
+          <div style={{ paddingLeft: 23, fontSize: 12.5, lineHeight: 1.7 }}>
+            총사업비: <b>{baseAfter.toLocaleString()}원</b> · 비목 합계: <b>{otherAfter.toLocaleString()}원</b> · 차액: <b style={{ color: C.red }}>{validDiff > 0 ? "+" : ""}{validDiff.toLocaleString()}원</b>
+          </div>
+        </div>
+      ) : (
+        <div style={{ background: C.greenLt, border: `1px solid ${C.green}55`, borderRadius: 4, padding: "10px 14px", marginBottom: 14, fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+          <Check size={15} style={{ color: C.green }} /> <b>총사업비와 비목 합계가 일치합니다.</b> ({baseAfter.toLocaleString()}원)
+        </div>
+      ))}
+
+      <Panel title="비목별 사업비 변경(안)" sub="비목/세목 단위로 변경 후 금액을 입력하세요"
+        extra={<Btn kind="primary" sm onClick={addBimok}><PlusCircle size={12} /> 비목 추가</Btn>} pad={false}>
         <TableWrap>
-          <thead><tr>{["비목", "현재 배정(원)", "변경 후(원)", "증감(원)"].map((h, i) => <th key={h} style={th(i ? "right" : "left")}>{h}</th>)}</tr></thead>
+          <thead><tr>{["비목", "세목", "세세목", "현재 배정(원)", "변경 후(원)", "증감(원)", ""].map((h, i) => <th key={h} style={th(i >= 3 ? "right" : "left")}>{h}</th>)}</tr></thead>
           <tbody>
-            {bimokList.map((bm) => {
-              const cur = getCurrent(bm), nv = after[bm] || 0, d = nv - cur;
-              return <tr key={bm} style={{ background: d ? (d > 0 ? C.greenLt : C.redLt) : "transparent" }}>
-                <td style={{ ...td(), fontWeight: 600 }}>{bm}</td>
-                <td style={{ ...td("right"), ...numCell }}>{cur.toLocaleString()}</td>
-                <td style={{ ...td("right") }}><input value={nv ? nv.toLocaleString() : "0"} onChange={(e) => setAfter({ ...after, [bm]: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} style={{ ...inp, width: 140, textAlign: "right", ...numCell }} /></td>
-                <td style={{ ...td("right"), ...numCell, fontWeight: 700, color: d > 0 ? C.green : d < 0 ? C.red : C.sub }}>{d === 0 ? "-" : `${d > 0 ? "+" : ""}${d.toLocaleString()}`}</td>
-              </tr>;
+            {groups.map(([gk, group]) => {
+              const items = group.items;
+              const gBefore = items.reduce((a, x) => a + (x._origBudget || 0), 0);
+              const gAfter = items.reduce((a, x) => a + (x.budget || 0), 0);
+              const gDiff = gAfter - gBefore;
+              const isBase = group.bimok === "총사업비";
+              return <React.Fragment key={gk}>
+                <tr style={{ background: isBase ? "#FFF8E1" : C.blueLt }}>
+                  <td style={{ ...td(), fontWeight: 800, color: isBase ? C.amber : C.blueDk }}>
+                    {isBase ? <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>총사업비 <Tag text="기준" color={C.amber} /></span> :
+                      <input value={group.bimok} onChange={(e) => setBimokName(gk, e.target.value)} placeholder="비목명 입력"
+                        style={{ ...inp, fontWeight: 800, color: C.blueDk, background: "transparent", border: "1px solid transparent", padding: "4px 6px", width: 130 }} />}
+                  </td>
+                  <td style={td()} colSpan={2}>
+                    {!isBase && <Btn kind="default" sm onClick={() => addSemok(gk)}><PlusCircle size={11} /> 세목 추가</Btn>}
+                  </td>
+                  <td style={{ ...td("right"), ...numCell, fontWeight: 800 }}>{gBefore.toLocaleString()}</td>
+                  <td style={{ ...td("right"), ...numCell, fontWeight: 800, color: isBase ? C.amber : C.text }}>{gAfter.toLocaleString()}</td>
+                  <td style={{ ...td("right"), ...numCell, fontWeight: 800, color: gDiff > 0 ? C.green : gDiff < 0 ? C.red : C.sub }}>{gDiff === 0 ? "-" : `${gDiff > 0 ? "+" : ""}${gDiff.toLocaleString()}`}</td>
+                  <td style={td()}>{!isBase && <button onClick={() => delBimok(gk)} title="비목 전체 삭제" style={{ border: "none", background: "none", cursor: "pointer", color: C.faint }}><Trash2 size={13} /></button>}</td>
+                </tr>
+                {items.map((row) => {
+                  const rDiff = (row.budget || 0) - (row._origBudget || 0);
+                  return <tr key={row._id} style={{ background: rDiff > 0 ? "rgba(40,167,69,0.04)" : rDiff < 0 ? "rgba(220,53,69,0.04)" : "transparent" }}>
+                    <td style={td()} />
+                    {isBase ? <>
+                      <td style={{ ...td(), color: C.sub }}>{row.semok}</td>
+                      <td style={{ ...td(), color: C.sub }}>{row.sse}</td>
+                      <td style={{ ...td("right"), ...numCell, color: C.amber }}>{(row._origBudget || 0).toLocaleString()}</td>
+                      <td style={{ ...td("right"), ...numCell, color: C.amber, fontWeight: 700 }}>{(row.budget || 0).toLocaleString()}</td>
+                    </> : <>
+                      <td style={td()}><input value={row.semok || ""} onChange={(e) => setAfterRow(row._id, "semok", e.target.value)} placeholder="세목" style={{ ...inp, width: 120, border: "1px solid transparent", background: "transparent" }} /></td>
+                      <td style={td()}><input value={row.sse || ""} onChange={(e) => setAfterRow(row._id, "sse", e.target.value)} placeholder="세세목" style={{ ...inp, width: 220, border: "1px solid transparent", background: "transparent" }} /></td>
+                      <td style={{ ...td("right"), ...numCell, color: C.sub }}>{(row._origBudget || 0).toLocaleString()}</td>
+                      <td style={td("right")}>
+                        <input value={(row.budget || 0).toLocaleString()} onChange={(e) => setAfterRow(row._id, "budget", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+                          style={{ ...inp, width: 130, textAlign: "right", ...numCell, fontWeight: 700 }} />
+                      </td>
+                    </>}
+                    <td style={{ ...td("right"), ...numCell, fontWeight: 700, color: rDiff > 0 ? C.green : rDiff < 0 ? C.red : C.sub }}>{rDiff === 0 ? "-" : `${rDiff > 0 ? "+" : ""}${rDiff.toLocaleString()}`}</td>
+                    <td style={td()}>{!isBase && <button onClick={() => delRow(row._id)} style={{ border: "none", background: "none", cursor: "pointer", color: C.faint }}><X size={13} /></button>}</td>
+                  </tr>;
+                })}
+              </React.Fragment>;
             })}
-            <tr style={{ background: "#F8F9FB" }}>
-              <td style={{ ...td(), fontWeight: 800 }}>합계</td>
-              <td style={{ ...td("right"), ...numCell, fontWeight: 800 }}>{tb.toLocaleString()}</td>
-              <td style={{ ...td("right"), ...numCell, fontWeight: 800 }}>{ta.toLocaleString()}</td>
-              <td style={{ ...td("right"), ...numCell, fontWeight: 800, color: ta - tb > 0 ? C.green : ta - tb < 0 ? C.red : C.sub }}>{ta - tb === 0 ? "총액 동일" : `${ta - tb > 0 ? "+" : ""}${(ta - tb).toLocaleString()}`}</td>
+            <tr style={{ background: C.navy }}>
+              <td style={{ ...td(), color: "#fff", fontWeight: 800, textAlign: "center" }} colSpan={3}>합 계 (총사업비 제외)</td>
+              <td style={{ ...td("right"), ...numCell, color: "#fff", fontWeight: 800 }}>{otherBefore.toLocaleString()}</td>
+              <td style={{ ...td("right"), ...numCell, color: "#fff", fontWeight: 800 }}>{otherAfter.toLocaleString()}</td>
+              <td style={{ ...td("right"), ...numCell, color: "#fff", fontWeight: 800 }}>{otherAfter - otherBefore === 0 ? "-" : `${otherAfter - otherBefore > 0 ? "+" : ""}${(otherAfter - otherBefore).toLocaleString()}`}</td>
+              <td style={{ ...td(), background: C.navy }} />
             </tr>
           </tbody>
         </TableWrap>
       </Panel>
-    ) : type === "연구기간 변경" ? (
+    </> : type === "연구기간 변경" ? (
       <Panel title="연구기간 변경(안)" pad>
         <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 13 }}>
           <span style={{ color: C.sub }}>현재: {co.period}</span><ChevronRight size={15} color={C.blue} />
