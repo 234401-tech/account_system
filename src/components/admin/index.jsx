@@ -1048,8 +1048,8 @@ const roleLabel = { master: "마스터 관리자", admin: "기관관리자", com
 const roleColor = { master: C.red, admin: C.blue, company: C.teal, auditor: C.amber };
 
 export function UserAdmin() {
-  const { user: currentUser } = useAuth();
-  const isMaster = currentUser?.role === "master";
+  const { effectiveRole } = useAuth();
+  const isMaster = effectiveRole === "master";
   const { companies } = useApp();
   const [userTab, setUserTab] = useState("list");
   const [users, setUsers] = useState([]);
