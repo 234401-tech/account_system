@@ -1047,12 +1047,19 @@ export function AccountRegister({ registered, onRegistered }) {
 
 export function InitialRegistration({ co, onDone }) {
   const makeInit = () => [{ id: "R1", name: co.pm || "", role: "연구책임자", position: "책임연구원", rate: 30, period: co.period, salary: true }];
+  const makeEmpty = () => [{ id: "R1", name: "", role: "연구책임자", position: "", rate: 0, period: "", salary: true }];
   const [people, setPeople] = useState(makeInit);
   const [acct, setAcct] = useState(false);
+  const [acctResetKey, setAcctResetKey] = useState(0);
   const setP = (i, k, v) => setPeople(people.map((p, idx) => idx === i ? { ...p, [k]: v } : p));
   const addP = () => setPeople([...people, { id: "R" + (people.length + 1), name: "", role: "참여연구원", position: "연구원", rate: 0, period: co.period, salary: true }]);
   const delP = (i) => setPeople(people.filter((_, idx) => idx !== i));
-  const resetAll = () => { setPeople(makeInit()); setAcct(false); };
+  const resetAll = () => {
+    if (!confirm("입력한 모든 정보를 초기화하시겠습니까?")) return;
+    setPeople(makeEmpty());
+    setAcct(false);
+    setAcctResetKey((k) => k + 1);
+  };
   const valid = people.some((p) => p.name) && acct;
 
   const steps = [
@@ -1094,8 +1101,8 @@ export function InitialRegistration({ co, onDone }) {
     </Panel>
 
     <Panel title="② 사업비 계좌 등록" sub="통장사본 업로드 시 계좌정보 자동 인식(OCR)"
-      extra={acct && <Btn kind="default" sm onClick={() => setAcct(false)}><RotateCw size={12} /> 재등록</Btn>}>
-      <AccountRegister registered={acct} onRegistered={() => setAcct(true)} />
+      extra={acct && <Btn kind="default" sm onClick={() => { setAcct(false); setAcctResetKey((k) => k + 1); }}><RotateCw size={12} /> 재등록</Btn>}>
+      <AccountRegister key={acctResetKey} registered={acct} onRegistered={() => setAcct(true)} />
     </Panel>
 
     <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12 }}>
