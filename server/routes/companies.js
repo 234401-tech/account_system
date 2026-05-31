@@ -61,7 +61,8 @@ router.put("/:id", (req, res) => {
     db.prepare("DELETE FROM researchers WHERE company_id = ?").run(req.params.id);
     const ins = db.prepare("INSERT INTO researchers (id,company_id,name,role,position,rate,period,salary) VALUES (?,?,?,?,?,?,?,?)");
     for (const r of researchers) {
-      ins.run(r.id, req.params.id, r.name, r.role, r.position, r.rate, r.period, r.salary ? 1 : 0);
+      const rid = r.id.includes(req.params.id) ? r.id : `${r.id}-${req.params.id}`;
+      ins.run(rid, req.params.id, r.name, r.role, r.position, r.rate, r.period, r.salary ? 1 : 0);
     }
   }
 
