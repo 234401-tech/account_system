@@ -1037,13 +1037,13 @@ export function AccountRegister({ registered, onRegistered }) {
 }
 
 export function InitialRegistration({ co, onDone }) {
-  const initPeople = [{ id: "R1", name: co.pm || "", role: "연구책임자", position: "책임연구원", rate: 30, period: co.period, salary: true }];
-  const [people, setPeople] = useState(initPeople);
+  const makeInit = () => [{ id: "R1", name: co.pm || "", role: "연구책임자", position: "책임연구원", rate: 30, period: co.period, salary: true }];
+  const [people, setPeople] = useState(makeInit);
   const [acct, setAcct] = useState(false);
   const setP = (i, k, v) => setPeople(people.map((p, idx) => idx === i ? { ...p, [k]: v } : p));
   const addP = () => setPeople([...people, { id: "R" + (people.length + 1), name: "", role: "참여연구원", position: "연구원", rate: 0, period: co.period, salary: true }]);
   const delP = (i) => setPeople(people.filter((_, idx) => idx !== i));
-  const resetAll = () => { setPeople(initPeople); setAcct(false); };
+  const resetAll = () => { setPeople(makeInit()); setAcct(false); };
   const valid = people.some((p) => p.name) && acct;
 
   const steps = [
