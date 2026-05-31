@@ -368,12 +368,27 @@ export function CompanyAmend({ co, amends, onSubmit }) {
 }
 
 export function AmendForm({ co, onSubmit, onFilesUploaded, initType }) {
+  const { budgetTrees, loadBudgetTree } = useApp();
   const [type, setType] = useState(initType || "사업비 변경");
   const [after, setAfter] = useState({ ...co.budget });
   const [periodAfter, setPeriodAfter] = useState(co.period);
   const [people, setPeople] = useState(co.researchers.map((r) => ({ ...r })));
   const [reason, setReason] = useState("");
-  const tb = sum(co.budget), ta = sum(after);
+
+  // 사용자가 편성한 실제 비목 목록 가져오기 (총사업비 제외)
+  useEffect(() => { if (co.id) loadBudgetTree(co.id); }, [co.id, loadBudgetTree]);
+  const tree = budgetTrees[co.id] || [];
+  const bimokTotals = {};
+  for (const r of tree) {
+    if (!r.bimok || r.bimok === "총사업비") continue;
+    bimokTotals[r.bimok] = (bimokTotals[r.bimok] || 0) + (r.budget || 0);
+  }
+  const bimokList = Object.keys(bimokTotals).length > 0
+    ? Object.keys(bimokTotals).sort((a, b) => { const ia = BIMOK_ORDER.indexOf(a), ib = BIMOK_ORDER.indexOf(b); return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib); })
+    : BIMOK_ORDER;
+  const getCurrent = (bm) => bimokTotals[bm] !== undefined ? bimokTotals[bm] : (co.budget?.[bm] || 0);
+  const tb = bimokList.reduce((a, bm) => a + getCurrent(bm), 0);
+  const ta = bimokList.reduce((a, bm) => a + (after[bm] || 0), 0);
   const lbl = { background: "#F8F9FB", padding: "11px 14px", fontSize: 12.5, fontWeight: 700, color: C.text, borderRight: `1px solid ${C.lineSoft}`, display: "flex", alignItems: "center" };
   const row = { display: "grid", gridTemplateColumns: "120px 1fr", borderBottom: `1px solid ${C.lineSoft}` };
   const cell = { padding: "9px 14px", display: "flex", alignItems: "center", gap: 8 };
@@ -422,12 +437,12 @@ export function AmendForm({ co, onSubmit, onFilesUploaded, initType }) {
         <TableWrap>
           <thead><tr>{["비목", "현재 배정(원)", "변경 후(원)", "증감(원)"].map((h, i) => <th key={h} style={th(i ? "right" : "left")}>{h}</th>)}</tr></thead>
           <tbody>
-            {BIMOK.map((bm) => {
-              const cur = co.budget[bm.key] || 0, nv = after[bm.key] || 0, d = nv - cur;
-              return <tr key={bm.key} style={{ background: d ? (d > 0 ? C.greenLt : C.redLt) : "transparent" }}>
-                <td style={{ ...td(), fontWeight: 600 }}>{bm.key}</td>
+            {bimokList.map((bm) => {
+              const cur = getCurrent(bm), nv = after[bm] || 0, d = nv - cur;
+              return <tr key={bm} style={{ background: d ? (d > 0 ? C.greenLt : C.redLt) : "transparent" }}>
+                <td style={{ ...td(), fontWeight: 600 }}>{bm}</td>
                 <td style={{ ...td("right"), ...numCell }}>{cur.toLocaleString()}</td>
-                <td style={{ ...td("right") }}><input value={nv ? nv.toLocaleString() : "0"} onChange={(e) => setAfter({ ...after, [bm.key]: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} style={{ ...inp, width: 140, textAlign: "right", ...numCell }} /></td>
+                <td style={{ ...td("right") }}><input value={nv ? nv.toLocaleString() : "0"} onChange={(e) => setAfter({ ...after, [bm]: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} style={{ ...inp, width: 140, textAlign: "right", ...numCell }} /></td>
                 <td style={{ ...td("right"), ...numCell, fontWeight: 700, color: d > 0 ? C.green : d < 0 ? C.red : C.sub }}>{d === 0 ? "-" : `${d > 0 ? "+" : ""}${d.toLocaleString()}`}</td>
               </tr>;
             })}
