@@ -753,11 +753,31 @@ export function BudgetSheet({ companyId }) {
 
   const getExec = (r) => r.exec_amt || r.exec || 0;
   const onUpload = (raw) => {
-    const parsed = raw.slice(1).filter((r) => r[0]).map((r, i) => ({ _id: "U" + i, bimok: String(r[0] || ""), semok: String(r[1] || ""), sse: String(r[2] || ""), gwamok: "", budget: Number(String(r[3]).replace(/[^0-9]/g, "")) || 0, exec_amt: Number(String(r[4]).replace(/[^0-9]/g, "")) || 0 }));
-    if (parsed.length) { setLocalRows(parsed); setToast(`예산 ${parsed.length}행을 엑셀로 불러왔습니다.`); }
+    // 엑셀 행 파싱 (총사업비 제외)
+    const parsed = raw.slice(1).filter((r) => r[0]).filter((r) => String(r[0]).trim() !== "총사업비").map((r, i) => ({ _id: "U" + Date.now() + "_" + i, bimok: String(r[0] || ""), semok: String(r[1] || ""), sse: String(r[2] || ""), gwamok: "", budget: Number(String(r[3]).replace(/[^0-9]/g, "")) || 0, exec_amt: Number(String(r[4]).replace(/[^0-9]/g, "")) || 0 }));
+    if (parsed.length) {
+      // 총사업비(기준) row는 보존
+      const baseRows = rows.filter((r) => r.bimok === "총사업비");
+      setLocalRows([...baseRows, ...parsed]);
+      setToast(`예산 ${parsed.length}행을 엑셀로 불러왔습니다. (총사업비는 보존)`);
+    }
   };
   const download = () => downloadXlsx("예산현황_" + new Date().toISOString().slice(0, 10) + ".xlsx", [["비목", "세목", "세세목", "예산(원)", "집행(원)", "잔액(원)", "집행률(%)"], ...rows.map((r) => [r.bimok, r.semok, r.sse, r.budget, getExec(r), r.budget - getExec(r), rate(getExec(r), r.budget)])]);
   const r = rate(totE, totB);
+
+  // 서버에 저장
+  const [saving, setSaving] = useState(false);
+  const saveAll = async () => {
+    setSaving(true);
+    try {
+      // _id, _group은 클라이언트 전용 필드 제거하고 전송
+      const payload = rows.map(({ _id, _group, _origBudget, ...rest }) => rest);
+      await updateBudgetTree(companyId, payload);
+      await loadBudgetTree(companyId);
+      setToast("예산이 저장되었습니다.");
+    } catch (e) { setToast("저장 실패: " + e.message); }
+    setSaving(false);
+  };
 
   return <>
     <PageHead title="과제 예산 현황" actions={
@@ -766,7 +786,8 @@ export function BudgetSheet({ companyId }) {
         <Btn kind="default" sm onClick={() => ref.current && ref.current.click()}><Upload size={13} /> 엑셀 업로드</Btn>
         <Btn kind="default" sm onClick={download}><Download size={13} /> 내보내기</Btn>
         <input ref={ref} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) parseXlsx(f, (rws) => { onUpload(rws); e.target.value = ""; }); }} />
-        <Btn kind="primary" sm onClick={addBimok}><PlusCircle size={13} /> 비목 추가</Btn>
+        <Btn kind="default" sm onClick={addBimok}><PlusCircle size={13} /> 비목 추가</Btn>
+        <Btn kind="primary" sm disabled={saving} onClick={saveAll}><Check size={13} /> {saving ? "저장 중..." : "저장"}</Btn>
       </div>} />
 
     <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 14 }}>
