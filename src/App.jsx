@@ -125,12 +125,12 @@ function Topbar({ myProjects = [], selectedProject, onSelectProject }) {
         <div style={{ fontSize: 12.5, color: "#C9D2DA" }}><b style={{ color: "#fff" }}>{user.name}</b> 님</div>
         {isMaster && (
           <select value={viewAs || ""} onChange={(e) => setViewAs(e.target.value || null)}
-            title="다른 역할로 화면 미리보기"
+            title="다른 역할로 화면 전환 (실데이터 변경 가능)"
             style={{ background: viewAs ? "#F59E0B" : "#2A3845", border: `1px solid ${viewAs ? "#F59E0B" : "#3A4A5A"}`, borderRadius: 4, padding: "4px 10px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-            <option value="">🔍 미리보기 (마스터)</option>
-            <option value="admin">🔍 기관관리자로 보기</option>
-            <option value="company">🔍 기업으로 보기</option>
-            <option value="auditor">🔍 회계사로 보기</option>
+            <option value="">🔄 역할 전환 (마스터)</option>
+            <option value="admin">🔄 기관관리자로 전환</option>
+            <option value="company">🔄 기업으로 전환</option>
+            <option value="auditor">🔄 회계사로 전환</option>
           </select>
         )}
         <button onClick={() => setShowPwModal(true)} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "1px solid #3A4A5A", borderRadius: 4, padding: "5px 12px", cursor: "pointer", color: "#9AA6B2", fontSize: 12 }}>
@@ -183,8 +183,8 @@ function Layout() {
     <div style={{ color: C.text, minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column" }}>
       <Topbar myProjects={projectsForTopbar} selectedProject={selectedProject || companyId} onSelectProject={setSelectedProject} />
       {isMaster && viewAs && (
-        <div style={{ background: "#F59E0B", color: "#fff", padding: "6px 20px", fontSize: 12.5, fontWeight: 700, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span>🔍 마스터 미리보기 — {{ company: "기업", auditor: "회계사", admin: "기관관리자" }[viewAs] || viewAs} 화면을 보고 있습니다</span>
+        <div style={{ background: "#F59E0B", color: "#fff", padding: "8px 20px", fontSize: 12.5, fontWeight: 700, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>⚠️ 역할 전환 모드 — <b>{{ company: "기업", auditor: "회계사", admin: "기관관리자" }[viewAs] || viewAs}</b> 화면입니다. 등록·신청·승인 등 모든 동작이 <u>실데이터에 반영</u>됩니다. 테스트는 <b>GB-2026-000</b> 과제에서 진행하세요.</span>
         </div>
       )}
       <div style={{ flex: 1, display: "flex" }}>

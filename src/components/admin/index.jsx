@@ -356,7 +356,9 @@ export function ImpactNote({ a: rawA, co }) {
 }
 
 export function AdminDash({ onPick }) {
-  const { companies, budgetTrees, ledgers, loadBudgetTree, loadLedger } = useApp();
+  const { companies: allCompanies, budgetTrees, ledgers, loadBudgetTree, loadLedger } = useApp();
+  // 테스트 과제(GB-2026-000)는 대시보드 집계에서 제외
+  const companies = allCompanies.filter((c) => c.id !== "GB-2026-000");
 
   // 모든 과제의 budget_tree와 ledger를 로드
   useEffect(() => {
