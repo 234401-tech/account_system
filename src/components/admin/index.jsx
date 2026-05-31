@@ -1251,7 +1251,8 @@ export function UserAdmin() {
                       <Btn kind="primary" sm onClick={async () => {
                         try {
                           const res = await api.approveResetRequest(r.id);
-                          setToast(`승인 완료. 임시 비번: ${res.tempPassword} (사용자에게 전달하세요)`);
+                          const mailMsg = res.mailSent ? "✉ 이메일 자동 발송됨" : (res.mailReason ? `이메일 발송 실패 (${res.mailReason}) — 직접 전달 필요` : "이메일 미설정 — 직접 전달 필요");
+                          setToast(`승인 완료. 임시 비번: ${res.tempPassword} · ${mailMsg}`);
                           loadResetReqs();
                         } catch (e) { setToast("실패: " + e.message); }
                       }}><Check size={11} /> 승인 + 임시비번 발급</Btn>

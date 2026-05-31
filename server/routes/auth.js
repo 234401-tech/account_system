@@ -2,6 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import db from "../db.js";
+import { sendTempPasswordMail, mailEnabled } from "../mailer.js";
 
 const router = Router();
 const SECRET = process.env.JWT_SECRET || "settlement-monitor-dev-secret-2026";
@@ -97,15 +98,21 @@ router.get("/reset-requests", authMiddleware, adminOnly, (_req, res) => {
   res.json(list);
 });
 
-// POST /api/auth/reset-requests/:id/approve — 관리자 승인 → 임시 비번 발급
-router.post("/reset-requests/:id/approve", authMiddleware, adminOnly, (req, res) => {
+// POST /api/auth/reset-requests/:id/approve — 관리자 승인 → 임시 비번 발급 + 이메일 발송
+router.post("/reset-requests/:id/approve", authMiddleware, adminOnly, async (req, res) => {
   const reqRow = db.prepare("SELECT * FROM password_reset_requests WHERE id = ?").get(req.params.id);
   if (!reqRow) return res.status(404).json({ error: "요청을 찾을 수 없습니다" });
   if (reqRow.status !== "대기") return res.status(400).json({ error: "이미 처리된 요청입니다" });
   const tempPw = Math.random().toString(36).slice(-8) + "!";
   db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(bcrypt.hashSync(tempPw, 10), reqRow.user_id);
   db.prepare("UPDATE password_reset_requests SET status = '승인', temp_password = ?, processed_at = datetime('now') WHERE id = ?").run(tempPw, req.params.id);
-  res.json({ tempPassword: tempPw, email: reqRow.email });
+
+  // 이메일 발송 시도 (SMTP 설정 있을 때만)
+  let mail = { sent: false };
+  if (mailEnabled) {
+    mail = await sendTempPasswordMail(reqRow.email, reqRow.name, tempPw);
+  }
+  res.json({ tempPassword: tempPw, email: reqRow.email, mailSent: mail.sent, mailReason: mail.reason });
 });
 
 // POST /api/auth/reset-requests/:id/reject — 관리자 거부
