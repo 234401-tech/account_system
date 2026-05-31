@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { BookText, Building2, Calendar, Check, ChevronRight, ClipboardList, CreditCard, Download, FileText, Home, Image, Info, LayoutGrid, Lock, Paperclip, PlusCircle, Receipt, RotateCw, ScanSearch, Send, Trash2, Upload, UserPlus, Users, X } from "lucide-react";
+import { BookText, Building2, Calendar, Check, ChevronRight, ClipboardList, CreditCard, Download, FileText, Home, Image, Info, LayoutGrid, Lock, LogOut, Paperclip, PlusCircle, Receipt, RotateCw, ScanSearch, Send, Trash2, Upload, UserPlus, Users, X } from "lucide-react";
 import { C, BIMOK, BIMOK_ORDER, SEMOK_TO_BIMOK, PERIOD, AMEND_STATUS } from "../../lib/theme.js";
 import { sum, won, eok, rate } from "../../lib/format.js";
 import { runChecks } from "../../lib/checks.js";
@@ -162,15 +162,35 @@ function HomeTab({ co, cid, checks, pendingAmend, onAmendClick }) {
 
 /* ═══════════ 기업 포털 ═══════════ */
 export function CompanyPortal({ companyId }) {
-  const { companies, amendments, submitAmendment, completeRegistration } = useApp();
-  const { logout } = useAuth();
+  const { companies, amendments, submitAmendment, completeRegistration, loading } = useApp();
+  const { user, logout } = useAuth();
   const cid = companyId;
   const [tab, setTab] = useState("home");
   const [toast, setToast] = useState("");
   const co = companies.find((c) => c.id === cid);
   useEffect(() => { setTab("home"); }, [cid]);
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(""), 2800); return () => clearTimeout(t); } }, [toast]);
-  if (!co) return <div style={{ padding: 40, color: C.sub, fontFamily: "Pretendard, sans-serif" }}>과제 정보를 불러오는 중…</div>;
+
+  // 데이터 로딩 중
+  if (loading) return <div style={{ padding: 40, color: C.sub, fontFamily: "Pretendard, sans-serif" }}>과제 정보를 불러오는 중…</div>;
+
+  // 연결된 과제가 없음 (관리자가 미연결로 설정)
+  if (!cid || !co) return (
+    <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "Pretendard, sans-serif", background: "#F5F7FA" }}>
+      <div style={{ maxWidth: 480, width: "90%", background: "#fff", border: `1px solid ${C.line}`, borderRadius: 8, padding: "30px 36px", textAlign: "center" }}>
+        <div style={{ fontSize: 36, marginBottom: 14 }}>📭</div>
+        <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 8 }}>연결된 과제가 없습니다</div>
+        <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, marginBottom: 20 }}>
+          관리자가 아직 과제를 연결하지 않았습니다.<br/>
+          관리자에게 과제 연결을 요청해 주세요.
+        </div>
+        <div style={{ fontSize: 12, color: C.sub, padding: "10px 14px", background: "#F8F9FB", borderRadius: 4, marginBottom: 16 }}>
+          <b>계정 정보:</b> {user?.name} ({user?.email})
+        </div>
+        <Btn kind="default" onClick={logout}><LogOut size={13} /> 로그아웃</Btn>
+      </div>
+    </div>
+  );
   const b = sum(co.budget), e = sum(co.exec), r = rate(e, b);
   const checks = runChecks(co);
   const myAmends = amendments.filter((a) => a.companyId === cid);
