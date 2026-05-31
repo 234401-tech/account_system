@@ -128,8 +128,13 @@ router.post("/reports/:reportId/files", upload.single("file"), (req, res) => {
   res.status(201).json({ id: fileId, filename: relPath, originalName: req.file.originalname });
 });
 
-// GET /api/audit/my-companies (회계사 전용 — 배정된 기업 목록)
+// GET /api/audit/my-companies (회계사 전용 — 배정된 기업 목록. 마스터는 전체)
 router.get("/my-companies", (req, res) => {
+  if (req.user.role === "master") {
+    // 마스터 미리보기 모드: 모든 과제 반환
+    const all = db.prepare("SELECT * FROM companies ORDER BY id").all();
+    return res.json(all.map((c) => ({ ...c, budget: JSON.parse(c.budget), exec: JSON.parse(c.exec_amt) })));
+  }
   if (req.user.role !== "auditor") return res.status(403).json({ error: "회계사 전용" });
   const assigned = db.prepare(`
     SELECT c.*, a.auditor_id FROM auditor_assignments a

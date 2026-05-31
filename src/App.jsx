@@ -47,7 +47,7 @@ function ChangePasswordModal({ onClose }) {
 }
 
 function Topbar({ myProjects = [], selectedProject, onSelectProject }) {
-  const { user, logout } = useAuth();
+  const { user, logout, isMaster, viewAs, setViewAs } = useAuth();
   const [showNotif, setShowNotif] = useState(false);
   const [showPwModal, setShowPwModal] = useState(false);
   const [notifs, setNotifs] = useState([]);
@@ -77,7 +77,7 @@ function Topbar({ myProjects = [], selectedProject, onSelectProject }) {
         <div style={{ padding: "5px 12px", borderRadius: 4, fontSize: 11.5, fontWeight: 700, background: user.role === "master" || user.role === "admin" ? C.blue + "33" : user.role === "auditor" ? C.amber + "33" : C.teal + "33", color: user.role === "master" || user.role === "admin" ? "#B0C4FF" : user.role === "auditor" ? "#E0C080" : "#7EDCC8" }}>
           {user.role === "master" ? "마스터 관리자" : user.role === "admin" ? "기관관리자" : user.role === "auditor" ? "회계사" : "기업 포털"}
         </div>
-        {user.role === "company" && myProjects.length > 1 && (
+        {((user.role === "company" && myProjects.length > 1) || (isMaster && viewAs === "company")) && (
           <select value={selectedProject || ""} onChange={(e) => onSelectProject(e.target.value)}
             style={{ background: "#2A3845", border: "1px solid #3A4A5A", borderRadius: 4, padding: "4px 10px", color: "#fff", fontSize: 12, fontWeight: 600 }}>
             {myProjects.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.id})</option>)}
@@ -123,6 +123,16 @@ function Topbar({ myProjects = [], selectedProject, onSelectProject }) {
           </div>}
         </div>
         <div style={{ fontSize: 12.5, color: "#C9D2DA" }}><b style={{ color: "#fff" }}>{user.name}</b> 님</div>
+        {isMaster && (
+          <select value={viewAs || ""} onChange={(e) => setViewAs(e.target.value || null)}
+            title="다른 역할로 화면 미리보기"
+            style={{ background: viewAs ? "#F59E0B" : "#2A3845", border: `1px solid ${viewAs ? "#F59E0B" : "#3A4A5A"}`, borderRadius: 4, padding: "4px 10px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+            <option value="">🔍 미리보기 (마스터)</option>
+            <option value="admin">🔍 기관관리자로 보기</option>
+            <option value="company">🔍 기업으로 보기</option>
+            <option value="auditor">🔍 회계사로 보기</option>
+          </select>
+        )}
         <button onClick={() => setShowPwModal(true)} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "1px solid #3A4A5A", borderRadius: 4, padding: "5px 12px", cursor: "pointer", color: "#9AA6B2", fontSize: 12 }}>
           <Lock size={13} />
         </button>
@@ -136,7 +146,7 @@ function Topbar({ myProjects = [], selectedProject, onSelectProject }) {
 }
 
 function Layout() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, viewAs, effectiveRole, isMaster } = useAuth();
   const { companies, loading: appLoading } = useApp();
   const [myProjects, setMyProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
@@ -157,17 +167,30 @@ function Layout() {
   if (window.location.hash === "#funding-mockup") return <FundingMockup />;
   if (!user) return <LoginPage />;
 
-  const companyId = user.role === "company"
-    ? (myProjects.length > 1 ? (selectedProject || myProjects[0]?.id) : user.companyId || myProjects[0]?.id)
+  // 마스터의 viewAs 모드 처리 — 테스트 과제 GB-2026-000 우선
+  const testProject = companies.find((c) => c.id === "GB-2026-000") || companies[0];
+  const masterViewCompanyId = testProject?.id || null;
+
+  const role = effectiveRole; // 마스터일 때 viewAs 적용된 role
+  const companyId = role === "company"
+    ? (isMaster ? (selectedProject || masterViewCompanyId) : (myProjects.length > 1 ? (selectedProject || myProjects[0]?.id) : user.companyId || myProjects[0]?.id))
     : (companies[0]?.id || null);
+
+  // 마스터가 기업으로 볼 때 모든 과제 목록을 myProjects로 전달
+  const projectsForTopbar = (isMaster && role === "company") ? companies : myProjects;
 
   return (
     <div style={{ color: C.text, minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column" }}>
-      <Topbar myProjects={myProjects} selectedProject={selectedProject} onSelectProject={setSelectedProject} />
+      <Topbar myProjects={projectsForTopbar} selectedProject={selectedProject || companyId} onSelectProject={setSelectedProject} />
+      {isMaster && viewAs && (
+        <div style={{ background: "#F59E0B", color: "#fff", padding: "6px 20px", fontSize: 12.5, fontWeight: 700, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>🔍 마스터 미리보기 — {{ company: "기업", auditor: "회계사", admin: "기관관리자" }[viewAs] || viewAs} 화면을 보고 있습니다</span>
+        </div>
+      )}
       <div style={{ flex: 1, display: "flex" }}>
-        {(user.role === "admin" || user.role === "master")
+        {(role === "admin" || role === "master")
           ? <AdminApp />
-          : user.role === "auditor"
+          : role === "auditor"
           ? <AuditorApp />
           : <CompanyPortal companyId={companyId} />}
       </div>

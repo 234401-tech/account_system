@@ -8,6 +8,13 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // 마스터 전용: 다른 역할로 화면 미리보기
+  const [viewAs, setViewAsState] = useState(() => localStorage.getItem("view_as") || null);
+  const setViewAs = (role) => {
+    if (role) localStorage.setItem("view_as", role);
+    else localStorage.removeItem("view_as");
+    setViewAsState(role);
+  };
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -50,9 +57,12 @@ export function AuthProvider({ children }) {
 
   const isAdmin = user?.role === "admin" || user?.role === "master";
   const isCompany = user?.role === "company";
+  const isMaster = user?.role === "master";
+  // 마스터일 때 viewAs를 적용해 effective role 계산
+  const effectiveRole = isMaster && viewAs ? viewAs : user?.role;
 
   return (
-    <AuthCtx.Provider value={{ user, loading, error, login, logout, signup: signupReq, isAdmin, isCompany }}>
+    <AuthCtx.Provider value={{ user, loading, error, login, logout, signup: signupReq, isAdmin, isCompany, isMaster, viewAs, setViewAs, effectiveRole }}>
       {children}
     </AuthCtx.Provider>
   );
