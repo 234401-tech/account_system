@@ -667,6 +667,31 @@ export function BudgetSheet({ companyId }) {
       <Kpi label="집행률" value={r} unit="%" sub={`집행 ${totE.toLocaleString()}`} accent={C.blue} />
     </div>
 
+    {/* 총사업비 ↔ 비목 합계 검증 */}
+    {(() => {
+      const baseTotal = rows.filter((r) => r.bimok === "총사업비").reduce((a, x) => a + (x.budget || 0), 0);
+      const otherTotal = rows.filter((r) => r.bimok && r.bimok !== "총사업비").reduce((a, x) => a + (x.budget || 0), 0);
+      if (baseTotal === 0 || otherTotal === 0) return null;
+      const diff = baseTotal - otherTotal;
+      if (diff === 0) return (
+        <div style={{ background: C.greenLt, border: `1px solid ${C.green}55`, borderRadius: 4, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: C.text, display: "flex", alignItems: "center", gap: 8 }}>
+          <Check size={15} style={{ color: C.green }} /> <b>총사업비와 비목 합계가 일치합니다.</b> ({baseTotal.toLocaleString()}원)
+        </div>
+      );
+      return (
+        <div style={{ background: C.redLt, border: `1px solid ${C.red}55`, borderRadius: 4, padding: "12px 16px", marginBottom: 14, fontSize: 13 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <Info size={15} style={{ color: C.red }} />
+            <b style={{ color: C.red }}>총사업비와 비목 합계가 일치하지 않습니다</b>
+          </div>
+          <div style={{ paddingLeft: 23, fontSize: 12.5, lineHeight: 1.7 }}>
+            총사업비: <b>{baseTotal.toLocaleString()}원</b> · 비목 합계: <b>{otherTotal.toLocaleString()}원</b> · 차액: <b style={{ color: C.red }}>{diff > 0 ? "+" : ""}{diff.toLocaleString()}원</b>
+            <span style={{ color: C.sub, marginLeft: 8 }}>({diff > 0 ? "비목을 더 편성해야 합니다" : "비목 편성액이 초과되었습니다"})</span>
+          </div>
+        </div>
+      );
+    })()}
+
     <Panel title="비목별 예산 현황" sub="셀을 클릭해 직접 수정 · 엑셀 업로드로 일괄 반영" pad={false}>
       <TableWrap>
         <thead><tr>{["비목", "세목", "세세목", "예산(원)", "집행(원)", "잔액(원)", "집행률", ""].map((h, i) => <th key={h} style={th(i >= 3 && i <= 6 ? "right" : "left")}>{h}</th>)}</tr></thead>
@@ -674,32 +699,51 @@ export function BudgetSheet({ companyId }) {
           {groups.map(([gk, group]) => {
             const items = group.items;
             const gb = items.reduce((a, x) => a + (x.budget || 0), 0), ge = items.reduce((a, x) => a + getExec(x), 0), grr = rate(ge, gb);
+            const isBase = group.bimok === "총사업비"; // 총사업비는 편집 불가 (기준선)
             return <React.Fragment key={gk}>
-              <tr style={{ background: C.blueLt }}>
-                <td style={{ ...td(), fontWeight: 800, color: C.blueDk }}>
-                  <input value={group.bimok} onChange={(e) => setBimokName(gk, e.target.value)} placeholder="비목명 입력"
-                    style={{ ...inp, fontWeight: 800, color: C.blueDk, background: "transparent", border: `1px solid transparent`, padding: "4px 6px", width: 130 }} />
+              <tr style={{ background: isBase ? "#FFF8E1" : C.blueLt }}>
+                <td style={{ ...td(), fontWeight: 800, color: isBase ? C.amber : C.blueDk }}>
+                  {isBase ? (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      총사업비 <Tag text="기준" color={C.amber} />
+                    </span>
+                  ) : (
+                    <input value={group.bimok} onChange={(e) => setBimokName(gk, e.target.value)} placeholder="비목명 입력"
+                      style={{ ...inp, fontWeight: 800, color: C.blueDk, background: "transparent", border: `1px solid transparent`, padding: "4px 6px", width: 130 }} />
+                  )}
                 </td>
                 <td style={td()} colSpan={2}>
-                  <Btn kind="default" sm onClick={() => addSemok(gk)}><PlusCircle size={11} /> 세목 추가</Btn>
+                  {!isBase && <Btn kind="default" sm onClick={() => addSemok(gk)}><PlusCircle size={11} /> 세목 추가</Btn>}
                 </td>
                 <td style={{ ...td("right"), ...numCell, fontWeight: 800 }}>{gb.toLocaleString()}</td>
                 <td style={{ ...td("right"), ...numCell, fontWeight: 800, color: ge > gb ? C.red : C.text }}>{ge.toLocaleString()}</td>
                 <td style={{ ...td("right"), ...numCell, fontWeight: 800, color: gb - ge < 0 ? C.red : C.text }}>{(gb - ge).toLocaleString()}</td>
                 <td style={{ ...td("right"), ...numCell, fontWeight: 800, color: grr > 100 ? C.red : C.text }}>{grr}%</td>
-                <td style={td()}><button onClick={() => delBimok(gk)} title="비목 전체 삭제" style={{ border: "none", background: "none", cursor: "pointer", color: C.faint }}><Trash2 size={13} /></button></td>
+                <td style={td()}>
+                  {!isBase && <button onClick={() => delBimok(gk)} title="비목 전체 삭제" style={{ border: "none", background: "none", cursor: "pointer", color: C.faint }}><Trash2 size={13} /></button>}
+                </td>
               </tr>
               {items.map((row) => {
                 const ex = getExec(row), rem = (row.budget || 0) - ex, rr = rate(ex, row.budget), over = rr > 100;
                 return <tr key={row._id}>
                   <td style={td()} />
-                  <td style={td()}><input value={row.semok} onChange={(e) => set(row._id, "semok", e.target.value)} placeholder="세목" style={{ ...inp, width: 120, border: "1px solid transparent", background: "transparent" }} /></td>
-                  <td style={td()}><input value={row.sse} onChange={(e) => set(row._id, "sse", e.target.value)} placeholder="세세목" style={{ ...inp, width: 280, border: "1px solid transparent", background: "transparent" }} /></td>
-                  <td style={td("right")}><input value={(row.budget || 0).toLocaleString()} onChange={(e) => set(row._id, "budget", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} style={{ ...inp, width: 130, textAlign: "right", ...numCell }} /></td>
+                  {isBase ? (
+                    <>
+                      <td style={{ ...td(), color: C.sub }}>{row.semok || "-"}</td>
+                      <td style={{ ...td(), color: C.sub }}>{row.sse || "-"}</td>
+                      <td style={{ ...td("right"), ...numCell, fontWeight: 700, color: C.amber }}>{(row.budget || 0).toLocaleString()}</td>
+                    </>
+                  ) : (
+                    <>
+                      <td style={td()}><input value={row.semok} onChange={(e) => set(row._id, "semok", e.target.value)} placeholder="세목" style={{ ...inp, width: 120, border: "1px solid transparent", background: "transparent" }} /></td>
+                      <td style={td()}><input value={row.sse} onChange={(e) => set(row._id, "sse", e.target.value)} placeholder="세세목" style={{ ...inp, width: 280, border: "1px solid transparent", background: "transparent" }} /></td>
+                      <td style={td("right")}><input value={(row.budget || 0).toLocaleString()} onChange={(e) => set(row._id, "budget", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} style={{ ...inp, width: 130, textAlign: "right", ...numCell }} /></td>
+                    </>
+                  )}
                   <td style={{ ...td("right"), ...numCell, fontWeight: 700, color: over ? C.red : C.text }}>{ex.toLocaleString()}</td>
                   <td style={{ ...td("right"), ...numCell, color: rem < 0 ? C.red : C.sub }}>{rem.toLocaleString()}</td>
                   <td style={{ ...td("right"), ...numCell }}><MiniBar v={rr} color={over ? C.red : rr > 85 ? C.amber : C.green} /> <b style={{ color: over ? C.red : C.text }}>{rr}%</b></td>
-                  <td style={td()}><button onClick={() => del(row._id)} style={{ border: "none", background: "none", cursor: "pointer", color: C.faint }}><X size={14} /></button></td>
+                  <td style={td()}>{!isBase && <button onClick={() => del(row._id)} style={{ border: "none", background: "none", cursor: "pointer", color: C.faint }}><X size={14} /></button>}</td>
                 </tr>;
               })}
             </React.Fragment>;
