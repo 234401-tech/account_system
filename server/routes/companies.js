@@ -45,6 +45,9 @@ router.post("/", (req, res) => {
 
 // PUT /api/companies/:id
 router.put("/:id", (req, res) => {
+  const isAdmin = req.user.role === "admin" || req.user.role === "master";
+  const isOwnCompany = req.user.role === "company" && req.user.companyId === req.params.id;
+  if (!isAdmin && !isOwnCompany) return res.status(403).json({ error: "권한이 없습니다" });
   const row = db.prepare("SELECT * FROM companies WHERE id = ?").get(req.params.id);
   if (!row) return res.status(404).json({ error: "과제를 찾을 수 없습니다" });
 
@@ -72,6 +75,10 @@ router.put("/:id", (req, res) => {
 router.get("/:id/budget", (req, res) => {
   if (req.user.role === "company" && req.user.companyId !== req.params.id)
     return res.status(403).json({ error: "접근 권한이 없습니다" });
+  if (req.user.role === "auditor") {
+    const assigned = db.prepare("SELECT 1 FROM auditor_assignments WHERE auditor_id = ? AND company_id = ?").get(req.user.id, req.params.id);
+    if (!assigned) return res.status(403).json({ error: "배정되지 않은 기업입니다" });
+  }
   const rows = db.prepare("SELECT * FROM budget_tree WHERE company_id = ? ORDER BY id").all(req.params.id);
   res.json(rows);
 });
@@ -94,6 +101,10 @@ router.put("/:id/budget", (req, res) => {
 router.get("/:id/ledger", (req, res) => {
   if (req.user.role === "company" && req.user.companyId !== req.params.id)
     return res.status(403).json({ error: "접근 권한이 없습니다" });
+  if (req.user.role === "auditor") {
+    const assigned = db.prepare("SELECT 1 FROM auditor_assignments WHERE auditor_id = ? AND company_id = ?").get(req.user.id, req.params.id);
+    if (!assigned) return res.status(403).json({ error: "배정되지 않은 기업입니다" });
+  }
   const rows = db.prepare("SELECT * FROM ledger WHERE company_id = ? ORDER BY date, id").all(req.params.id);
   const withFiles = rows.map(r => {
     const files = db.prepare("SELECT * FROM evidence_files WHERE ledger_id = ?").all(r.id);
