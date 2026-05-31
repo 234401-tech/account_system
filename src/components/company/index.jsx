@@ -1458,6 +1458,81 @@ export function CompanyLogin({ companies, onLogin }) {
 
 const MOCK_MONTHS = ["2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10", "2026-11", "2026-12"];
 
+function BankInfoPanel({ co, bookImg, bookPreview, bookRef, handleBookUpload, setToast, setBookImg, setBookPreview }) {
+  const { refreshCompanies } = useApp();
+  const [edit, setEdit] = useState(!co?.bankName);  // 비어있으면 편집 모드로 시작
+  const [form, setForm] = useState({ bankName: co?.bankName || "", bankAccount: co?.bankAccount || "", bankHolder: co?.bankHolder || "" });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setForm({ bankName: co?.bankName || "", bankAccount: co?.bankAccount || "", bankHolder: co?.bankHolder || "" });
+    if (!co?.bankName) setEdit(true);
+  }, [co?.id]);
+
+  const save = async () => {
+    if (!form.bankName || !form.bankAccount || !form.bankHolder) { setToast("은행/계좌번호/예금주를 모두 입력하세요."); return; }
+    setSaving(true);
+    try {
+      await api.updateCompany(co.id, { bankName: form.bankName, bankAccount: form.bankAccount, bankHolder: form.bankHolder });
+      await refreshCompanies();
+      setToast("계좌 정보가 저장되었습니다.");
+      setEdit(false);
+    } catch (e) { setToast("저장 실패: " + e.message); }
+    setSaving(false);
+  };
+
+  return <Panel title="사업비 통장사본" sub="사업비 전용계좌 정보 + 통장사본"
+    extra={!edit && <Btn kind="default" sm onClick={() => setEdit(true)}>계좌 수정</Btn>}>
+    <div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-start" }}>
+      <div style={{ width: 280, flexShrink: 0 }}>
+        <div onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) { setBookImg(f); setBookPreview(URL.createObjectURL(f)); setToast("통장사본이 등록되었습니다."); } }}
+          onDragOver={(e) => e.preventDefault()}
+          onClick={() => bookRef.current && bookRef.current.click()}
+          style={{ border: `2px dashed ${bookPreview ? C.green : C.line}`, borderRadius: 8, height: 200, display: "grid", placeItems: "center", cursor: "pointer", background: bookPreview ? "#fff" : "#FAFBFC", overflow: "hidden" }}>
+          {bookPreview ? <img src={bookPreview} alt="통장사본" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+            : <div style={{ textAlign: "center", color: C.sub }}>
+                <Upload size={24} style={{ marginBottom: 6 }} />
+                <div style={{ fontSize: 13, fontWeight: 700 }}>통장사본 업로드</div>
+                <div style={{ fontSize: 11.5, marginTop: 3 }}>드래그하거나 클릭</div>
+              </div>}
+        </div>
+        <input ref={bookRef} type="file" accept="image/*,.pdf" style={{ display: "none" }} onChange={handleBookUpload} />
+        {bookImg && <div style={{ fontSize: 12, color: C.sub, marginTop: 6, display: "flex", alignItems: "center", gap: 5 }}><Paperclip size={11} /> {bookImg.name}</div>}
+      </div>
+      <div style={{ flex: 1, minWidth: 280 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>계좌 정보 {edit && <span style={{ fontSize: 11.5, color: C.red, fontWeight: 600, marginLeft: 6 }}>* 입력 후 저장하세요</span>}</div>
+        <div style={{ border: `1px solid ${C.line}`, borderRadius: 4, overflow: "hidden" }}>
+          {[
+            ["은행", "bankName", "예: 농협은행"],
+            ["계좌번호", "bankAccount", "예: 301-0000-0000-00"],
+            ["예금주", "bankHolder", "예: (주)○○테크"],
+          ].map(([label, key, ph], i) => (
+            <div key={key} style={{ display: "grid", gridTemplateColumns: "100px 1fr", borderBottom: `1px solid ${C.lineSoft}` }}>
+              <div style={{ background: "#F8F9FB", padding: "9px 12px", fontSize: 12.5, fontWeight: 700, borderRight: `1px solid ${C.lineSoft}` }}>{label}</div>
+              <div style={{ padding: "8px 12px" }}>
+                {edit
+                  ? <input value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} placeholder={ph} style={{ ...inp, width: "100%", maxWidth: 280 }} />
+                  : <span style={{ fontSize: 13 }}>{co?.[key] || "-"}</span>}
+              </div>
+            </div>
+          ))}
+          <div style={{ display: "grid", gridTemplateColumns: "100px 1fr" }}>
+            <div style={{ background: "#F8F9FB", padding: "9px 12px", fontSize: 12.5, fontWeight: 700, borderRight: `1px solid ${C.lineSoft}` }}>용도</div>
+            <div style={{ padding: "9px 12px", fontSize: 13 }}>사업비 전용계좌</div>
+          </div>
+        </div>
+        {edit && <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, marginTop: 10 }}>
+          {co?.bankName && <Btn kind="default" sm onClick={() => { setForm({ bankName: co.bankName, bankAccount: co.bankAccount, bankHolder: co.bankHolder }); setEdit(false); }}>취소</Btn>}
+          <Btn kind="primary" sm disabled={saving} onClick={save}><Check size={13} /> {saving ? "저장 중..." : "저장"}</Btn>
+        </div>}
+        {!bookPreview && <div style={{ marginTop: 10, padding: "10px 14px", background: C.amberLt, border: `1px solid ${C.amber}40`, borderRadius: 4, fontSize: 12.5 }}>
+          통장사본 이미지를 등록하면 관리자 검토 시 활용됩니다.
+        </div>}
+      </div>
+    </div>
+  </Panel>;
+}
+
 export function BankManager({ companyId }) {
   const { companies } = useApp();
   const co = companies.find((c) => c.id === companyId);
@@ -1517,43 +1592,7 @@ export function BankManager({ companyId }) {
       </div>
     } />
 
-    {/* 사업비 통장사본 */}
-    <Panel title="사업비 통장사본" sub="협약 시 등록한 사업비 전용계좌 통장사본">
-      <div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-start" }}>
-        <div style={{ width: 280, flexShrink: 0 }}>
-          <div onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) { setBookImg(f); setBookPreview(URL.createObjectURL(f)); setToast("통장사본이 등록되었습니다."); } }}
-            onDragOver={(e) => e.preventDefault()}
-            onClick={() => bookRef.current && bookRef.current.click()}
-            style={{ border: `2px dashed ${bookPreview ? C.green : C.line}`, borderRadius: 8, height: 200, display: "grid", placeItems: "center", cursor: "pointer", background: bookPreview ? "#fff" : "#FAFBFC", overflow: "hidden", transition: "all 0.15s" }}>
-            {bookPreview
-              ? <img src={bookPreview} alt="통장사본" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
-              : <div style={{ textAlign: "center", color: C.sub }}>
-                  <Upload size={24} style={{ marginBottom: 6 }} />
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>통장사본 업로드</div>
-                  <div style={{ fontSize: 11.5, marginTop: 3 }}>드래그하거나 클릭</div>
-                </div>}
-          </div>
-          <input ref={bookRef} type="file" accept="image/*,.pdf" style={{ display: "none" }} onChange={handleBookUpload} />
-          {bookImg && <div style={{ fontSize: 12, color: C.sub, marginTop: 6, display: "flex", alignItems: "center", gap: 5 }}>
-            <Paperclip size={11} /> {bookImg.name}
-          </div>}
-        </div>
-        <div style={{ flex: 1, minWidth: 240 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: C.text }}>계좌 정보</div>
-          <div style={{ border: `1px solid ${C.line}`, borderRadius: 4, overflow: "hidden" }}>
-            {[["은행", co?.bankName || "-"], ["계좌번호", co?.bankAccount || "-"], ["예금주", co?.bankHolder || "-"], ["용도", "사업비 전용계좌"]].map(([label, val], i, arr) => (
-              <div key={label} style={{ display: "grid", gridTemplateColumns: "100px 1fr", borderBottom: i < arr.length - 1 ? `1px solid ${C.lineSoft}` : "none" }}>
-                <div style={{ background: "#F8F9FB", padding: "9px 12px", fontSize: 12.5, fontWeight: 700, color: C.text, borderRight: `1px solid ${C.lineSoft}` }}>{label}</div>
-                <div style={{ padding: "9px 12px", fontSize: 13, color: C.text }}>{val}</div>
-              </div>
-            ))}
-          </div>
-          {!bookPreview && <div style={{ marginTop: 10, padding: "10px 14px", background: C.amberLt, border: `1px solid ${C.amber}40`, borderRadius: 4, fontSize: 12.5, color: C.text }}>
-            통장사본 이미지를 등록하면 관리자 검토 시 활용됩니다.
-          </div>}
-        </div>
-      </div>
-    </Panel>
+    <BankInfoPanel co={co} bookImg={bookImg} bookPreview={bookPreview} bookRef={bookRef} handleBookUpload={handleBookUpload} setToast={setToast} setBookImg={setBookImg} setBookPreview={setBookPreview} />
 
     {/* 월별 통장거래 내역 */}
     <Panel title="월별 통장거래 내역" sub="매월 통장 거래내역을 엑셀 또는 이미지로 업로드" pad={false}
