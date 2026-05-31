@@ -1666,7 +1666,7 @@ export function BankManager({ companyId }) {
       </> : <div style={{ padding: "32px 16px", textAlign: "center", color: C.sub }}>
         <Calendar size={28} style={{ marginBottom: 8, opacity: 0.4 }} />
         <div style={{ fontSize: 13, fontWeight: 600 }}>{selMonth.replace("-", "년 ")}월 거래내역이 없습니다</div>
-        <div style={{ fontSize: 12, marginTop: 4 }}>엑셀 파일(.xlsx) 또는 통장 캡처 이미지를 업로드하세요</div>
+        <div style={{ fontSize: 12, marginTop: 4 }}>엑셀 파일(.xlsx), PDF 또는 이미지 파일을 업로드하세요</div>
       </div>}
     </Panel>
     {toast && <Toast text={toast} />}
