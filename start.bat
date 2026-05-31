@@ -16,6 +16,7 @@ cd server
 if not exist "node_modules" call npm install
 if not exist "data" mkdir data
 if not exist "data\app.db" node seed.js
+node migrate.js
 
 :: Get local IP
 for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
