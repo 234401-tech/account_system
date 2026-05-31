@@ -252,7 +252,12 @@ export function IssueBoard() {
             <td style={{ ...td("right"), ...numCell, fontWeight: 700 }}>{bt.toLocaleString()}</td>
             <td style={{ ...td(), ...numCell }}>{c.period}</td>
             <td style={td()}><Status s={c.status} /></td>
-            <td style={td()}><Btn kind="default" sm onClick={() => { setEditProject(c); setMode("edit"); }}>수정</Btn></td>
+            <td style={td()}>
+              <div style={{ display: "flex", gap: 4 }}>
+                <Btn kind="default" sm onClick={() => { setEditProject(c); setMode("edit"); }}>수정</Btn>
+                <Btn kind="danger" sm onClick={async () => { if (!confirm(`${c.name} (${c.id}) 과제를 삭제하시겠습니까?`)) return; await api.deleteCompany(c.id); setToast("과제가 삭제되었습니다."); window.location.reload(); }}><Trash2 size={11} /></Btn>
+              </div>
+            </td>
           </tr>; })}
         </tbody>
       </TableWrap>

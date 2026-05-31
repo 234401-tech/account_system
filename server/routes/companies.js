@@ -70,6 +70,16 @@ router.put("/:id", (req, res) => {
   res.json(companyRow(updated));
 });
 
+// DELETE /api/companies/:id
+router.delete("/:id", (req, res) => {
+  if (req.user.role !== "admin" && req.user.role !== "master") return res.status(403).json({ error: "관리자 권한이 필요합니다" });
+  db.prepare("DELETE FROM researchers WHERE company_id = ?").run(req.params.id);
+  db.prepare("DELETE FROM budget_tree WHERE company_id = ?").run(req.params.id);
+  db.prepare("DELETE FROM ledger WHERE company_id = ?").run(req.params.id);
+  db.prepare("DELETE FROM companies WHERE id = ?").run(req.params.id);
+  res.json({ ok: true });
+});
+
 // --- 예산 트리 ---
 
 // GET /api/companies/:id/budget

@@ -18,6 +18,7 @@ export const updateCompany = (id, patch) => http_put(`/api/companies/${id}`, pat
 export const completeRegistration = (id, researchers) =>
   http_put(`/api/companies/${id}`, { researchers, status: "집행중" });
 export const nextCompanyId = () => http_get("/api/companies/_next-id").then(r => r.id);
+export const deleteCompany = (id) => http_del(`/api/companies/${id}`);
 
 // --- 예산 트리 ---
 export const getBudgetTree = (companyId) => http_get(`/api/companies/${companyId}/budget`);
