@@ -68,6 +68,14 @@ export const addGroupProject = (groupId, projectId) => http_post(`/api/groups/${
 export const removeGroupProject = (groupId, projectId) => http_del(`/api/groups/${groupId}/projects/${projectId}`);
 export const getMyProjects = () => http_get("/api/groups/my-projects");
 
+// --- 연구비 사용기준 (정책/규정) ---
+export const getPolicy = (companyId) => http_get(`/api/policy/${companyId}`);
+export const addPolicyItem = (companyId, data) => http_post(`/api/policy/${companyId}/items`, data);
+export const updatePolicyItem = (companyId, id, data) => http_put(`/api/policy/${companyId}/items/${id}`, data);
+export const deletePolicyItem = (companyId, id) => http_del(`/api/policy/${companyId}/items/${id}`);
+export const uploadPolicyFile = (companyId, file) => http_upload(`/api/policy/${companyId}/files`, file);
+export const deletePolicyFile = (companyId, id) => http_del(`/api/policy/${companyId}/files/${id}`);
+
 // --- 알림 ---
 export const listNotifications = () => http_get("/api/notifications");
 export const markNotificationRead = (id) => http_post(`/api/notifications/read/${id}`, {});

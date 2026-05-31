@@ -12,6 +12,7 @@ import auditRouter from "./routes/audit.js";
 import usersRouter from "./routes/users.js";
 import notificationsRouter from "./routes/notifications.js";
 import groupsRouter from "./routes/groups.js";
+import policyRouter from "./routes/policy.js";
 import { requestLogger } from "./logger.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -34,6 +35,7 @@ app.use("/api/audit", auditRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/groups", groupsRouter);
+app.use("/api/policy", policyRouter);
 
 // 헬스체크
 app.get("/api/health", (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));

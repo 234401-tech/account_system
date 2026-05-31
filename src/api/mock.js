@@ -222,6 +222,14 @@ export const addGroupProject = (gid, pid) => delay({ ok: true });
 export const removeGroupProject = (gid, pid) => delay({ ok: true });
 export const getMyProjects = () => delay(companies.map((c) => ({ ...c })));
 
+// --- 연구비 사용기준 ---
+export const getPolicy = () => delay({ items: [], files: [] });
+export const addPolicyItem = () => delay({ id: 1 });
+export const updatePolicyItem = () => delay({ ok: true });
+export const deletePolicyItem = () => delay({ ok: true });
+export const uploadPolicyFile = () => delay({ id: 1 });
+export const deletePolicyFile = () => delay({ ok: true });
+
 // --- 알림 ---
 let mockNotifications = [];
 export const listNotifications = () => delay([...mockNotifications]);

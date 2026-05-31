@@ -267,14 +267,7 @@ export function CompanyPortal({ companyId }) {
 
       {!needsReg && tab === "audit" && <AuditResult companyId={cid} />}
       {!needsReg && tab === "settle" && <SettleView co={co} checks={checks} onSubmit={() => setToast("집행마감 후 사용실적보고서가 제출되었습니다.")} />}
-      {!needsReg && tab === "rule" && (
-        <Panel title="연구비 사용기준" sub="자체규정 미등록 시 공무원 규정 기본 적용" pad={false}>
-          <TableWrap>
-            <thead><tr>{["기준 항목", "적용 내용", "상태"].map((h) => <th key={h} style={th()}>{h}</th>)}</tr></thead>
-            <tbody>{[["기관 자체 연구비 사용규정", "미등록 → 공무원 여비·집행 기준 자동 적용", C.amber, "미등록"], ["국내출장 여비", "공무원 여비규정 준용 (일비·숙박비 상한)", C.gray, "기본적용"], ["연구활동비 식비 한도", "1인 1식 기준 한도", C.gray, "기본적용"], ["비목별 전용 한도", "비목 간 전용 시 협약변경 절차 적용", C.gray, "기본적용"]].map(([t, v, c, s]) => <tr key={t}><td style={{ ...td(), fontWeight: 600 }}>{t}</td><td style={td()}>{v}</td><td style={td()}><Tag text={s} color={c} /></td></tr>)}</tbody>
-          </TableWrap>
-        </Panel>
-      )}
+      {!needsReg && tab === "rule" && <PolicyManager companyId={cid} />}
       {toast && <Toast text={toast} />}
     </Shell>
   );
@@ -1448,5 +1441,166 @@ export function AuditResult({ companyId }) {
         </>}
       </Panel>
     </>}
+  </>;
+}
+
+/* ═══════════════════ 연구비 사용기준 관리 ═══════════════════ */
+const POLICY_STATUS_COLORS = { 등록: C.green, 기본적용: C.blue, 미등록: C.amber };
+const DEFAULT_POLICY_ITEMS = [
+  { item: "기관 자체 연구비 사용규정", content: "미등록 → 공무원 여비·집행 기준 자동 적용", status: "미등록" },
+  { item: "국내출장 여비", content: "공무원 여비규정 준용 (일비·숙박비 상한)", status: "기본적용" },
+  { item: "연구활동비 식비 한도", content: "1인 1식 기준 한도", status: "기본적용" },
+  { item: "비목별 전용 한도", content: "비목 간 전용 시 협약변경 절차 적용", status: "기본적용" },
+];
+
+export function PolicyManager({ companyId, readOnly = false }) {
+  const [items, setItems] = useState([]);
+  const [files, setFiles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editId, setEditId] = useState(null);
+  const [editRow, setEditRow] = useState({});
+  const [adding, setAdding] = useState(false);
+  const [newRow, setNewRow] = useState({ item: "", content: "", status: "등록" });
+  const [toast, setToast] = useState("");
+  const fileRef = useRef(null);
+
+  const load = async () => {
+    try {
+      const r = await api.getPolicy(companyId);
+      setItems(r.items || []);
+      setFiles(r.files || []);
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, [companyId]);
+  useEffect(() => { if (toast) { const t = setTimeout(() => setToast(""), 2500); return () => clearTimeout(t); } }, [toast]);
+
+  const startEdit = (row) => { setEditId(row.id); setEditRow(row); };
+  const saveEdit = async () => {
+    try { await api.updatePolicyItem(companyId, editId, editRow); setToast("수정되었습니다"); setEditId(null); load(); } catch (e) { setToast("수정 실패: " + e.message); }
+  };
+  const removeItem = async (id) => {
+    if (!confirm("이 기준 항목을 삭제하시겠습니까?")) return;
+    try { await api.deletePolicyItem(companyId, id); setToast("삭제되었습니다"); load(); } catch (e) { setToast("삭제 실패: " + e.message); }
+  };
+  const addNew = async () => {
+    if (!newRow.item || !newRow.content) return;
+    try { await api.addPolicyItem(companyId, newRow); setToast("추가되었습니다"); setNewRow({ item: "", content: "", status: "등록" }); setAdding(false); load(); } catch (e) { setToast("추가 실패: " + e.message); }
+  };
+  const seedDefaults = async () => {
+    if (!confirm("기본 기준 항목 4개를 일괄 등록하시겠습니까?")) return;
+    for (const r of DEFAULT_POLICY_ITEMS) { try { await api.addPolicyItem(companyId, r); } catch (e) { console.error(e); } }
+    setToast("기본 항목이 등록되었습니다"); load();
+  };
+  const onUpload = async (file) => {
+    if (!file) return;
+    try { await api.uploadPolicyFile(companyId, file); setToast("파일이 업로드되었습니다"); load(); } catch (e) { setToast("업로드 실패: " + e.message); }
+  };
+  const removeFile = async (id) => {
+    if (!confirm("이 파일을 삭제하시겠습니까?")) return;
+    try { await api.deletePolicyFile(companyId, id); setToast("삭제되었습니다"); load(); } catch (e) { setToast("삭제 실패: " + e.message); }
+  };
+
+  if (loading) return <div style={{ padding: 24, color: C.sub }}>불러오는 중…</div>;
+
+  return <>
+    {/* ① 자체 규정 파일 */}
+    <Panel title="① 기관 자체 연구비 사용규정 (파일)" sub="PDF / HWPX / DOCX 등 자체규정 문서를 첨부하세요">
+      {!readOnly && (
+        <div
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) onUpload(f); }}
+          onClick={() => fileRef.current && fileRef.current.click()}
+          style={{ border: `2px dashed ${C.line}`, borderRadius: 6, padding: "24px 20px", textAlign: "center", cursor: "pointer", background: "#FAFBFC", marginBottom: 12 }}>
+          <Upload size={24} style={{ color: C.sub, marginBottom: 6 }} />
+          <div style={{ fontSize: 13.5, fontWeight: 700 }}>규정 파일 업로드</div>
+          <div style={{ fontSize: 11.5, color: C.sub, marginTop: 4 }}>드래그하거나 클릭 · PDF, HWPX, DOCX, DOC</div>
+          <input ref={fileRef} type="file" accept=".pdf,.hwpx,.docx,.doc" style={{ display: "none" }} onChange={(e) => onUpload(e.target.files[0])} />
+        </div>
+      )}
+      {files.length > 0 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {files.map((f) => (
+            <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: C.greenLt, border: `1px solid ${C.green}40`, borderRadius: 4 }}>
+              <FileText size={16} style={{ color: C.green }} />
+              <a href={`/uploads/${f.filename}`} target="_blank" rel="noreferrer" style={{ flex: 1, fontSize: 13, fontWeight: 700, color: C.text, textDecoration: "none" }}>{f.original_name}</a>
+              <div style={{ fontSize: 11.5, color: C.sub }}>{(f.size / 1024).toFixed(1)}KB · {(f.uploaded_at || "").slice(0, 10)}</div>
+              <a href={`/uploads/${f.filename}`} download style={{ textDecoration: "none" }}><Btn kind="default" sm><Download size={11} /></Btn></a>
+              {!readOnly && <Btn kind="danger" sm onClick={() => removeFile(f.id)}><Trash2 size={11} /></Btn>}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ padding: "10px 14px", background: C.amberLt, border: `1px solid ${C.amber}40`, borderRadius: 4, fontSize: 12.5 }}>
+          ⓘ 자체규정 미등록 시 <b>공무원 여비·집행 기준이 자동 적용</b>됩니다.
+        </div>
+      )}
+    </Panel>
+
+    {/* ② 기준 항목 */}
+    <Panel title="② 기준 항목 관리" sub="기관별 적용 기준을 추가/수정할 수 있습니다" pad={false}
+      extra={!readOnly && <div style={{ display: "flex", gap: 6 }}>
+        {items.length === 0 && <Btn kind="default" sm onClick={seedDefaults}>기본 항목 일괄 등록</Btn>}
+        <Btn kind="primary" sm onClick={() => setAdding(true)}><PlusCircle size={12} /> 기준 추가</Btn>
+      </div>}>
+      {items.length === 0 && !adding ? (
+        <div style={{ padding: "30px 16px", textAlign: "center", color: C.sub, fontSize: 13 }}>
+          등록된 기준 항목이 없습니다. {!readOnly && "위의 [기본 항목 일괄 등록] 또는 [기준 추가] 버튼을 사용하세요."}
+        </div>
+      ) : (
+        <TableWrap>
+          <thead><tr>{["기준 항목", "적용 내용", "상태", ...(readOnly ? [] : ["관리"])].map((h) => <th key={h} style={th()}>{h}</th>)}</tr></thead>
+          <tbody>
+            {items.map((row) => editId === row.id ? (
+              <tr key={row.id}>
+                <td style={td()}><input value={editRow.item} onChange={(e) => setEditRow({ ...editRow, item: e.target.value })} style={{ ...inp, width: "100%" }} /></td>
+                <td style={td()}><input value={editRow.content} onChange={(e) => setEditRow({ ...editRow, content: e.target.value })} style={{ ...inp, width: "100%" }} /></td>
+                <td style={td()}>
+                  <select value={editRow.status} onChange={(e) => setEditRow({ ...editRow, status: e.target.value })} style={{ ...inp, padding: "4px 6px" }}>
+                    <option>등록</option><option>기본적용</option><option>미등록</option>
+                  </select>
+                </td>
+                <td style={td()}>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <Btn kind="primary" sm onClick={saveEdit}><Check size={11} /></Btn>
+                    <Btn kind="default" sm onClick={() => setEditId(null)}><X size={11} /></Btn>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              <tr key={row.id}>
+                <td style={{ ...td(), fontWeight: 700 }}>{row.item}</td>
+                <td style={{ ...td(), color: C.text }}>{row.content}</td>
+                <td style={td()}><Tag text={row.status} color={POLICY_STATUS_COLORS[row.status] || C.gray} /></td>
+                {!readOnly && <td style={td()}>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <Btn kind="default" sm onClick={() => startEdit(row)}>수정</Btn>
+                    <Btn kind="danger" sm onClick={() => removeItem(row.id)}><Trash2 size={11} /></Btn>
+                  </div>
+                </td>}
+              </tr>
+            ))}
+            {adding && (
+              <tr style={{ background: C.blueLt }}>
+                <td style={td()}><input value={newRow.item} onChange={(e) => setNewRow({ ...newRow, item: e.target.value })} placeholder="예: 도서구입비 한도" style={{ ...inp, width: "100%" }} /></td>
+                <td style={td()}><input value={newRow.content} onChange={(e) => setNewRow({ ...newRow, content: e.target.value })} placeholder="예: 1인 연 50만원" style={{ ...inp, width: "100%" }} /></td>
+                <td style={td()}>
+                  <select value={newRow.status} onChange={(e) => setNewRow({ ...newRow, status: e.target.value })} style={{ ...inp, padding: "4px 6px" }}>
+                    <option>등록</option><option>기본적용</option><option>미등록</option>
+                  </select>
+                </td>
+                <td style={td()}>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <Btn kind="primary" sm onClick={addNew}><Check size={11} /></Btn>
+                    <Btn kind="default" sm onClick={() => { setAdding(false); setNewRow({ item: "", content: "", status: "등록" }); }}><X size={11} /></Btn>
+                  </div>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </TableWrap>
+      )}
+    </Panel>
+    {toast && <Toast text={toast} />}
   </>;
 }

@@ -7,6 +7,7 @@ import { CompanyPortal } from "./components/company/index.jsx";
 import { AdminApp } from "./components/admin/index.jsx";
 import { AuditorApp } from "./components/auditor/index.jsx";
 import { LoginPage } from "./components/auth/LoginPage.jsx";
+import { PolicyMockup } from "./components/company/PolicyMockup.jsx";
 import { api } from "./api/index.js";
 
 const notifIcon = { amend: FileText, signup: Users, exec: CreditCard, audit: ClipboardList };
@@ -149,6 +150,7 @@ function Layout() {
 
   if (authLoading || appLoading) return <div style={{ padding: 40, color: C.sub, fontFamily: "Pretendard, sans-serif" }}>불러오는 중…</div>;
 
+  if (window.location.hash === "#policy-mockup") return <PolicyMockup />;
   if (!user) return <LoginPage />;
 
   const companyId = user.role === "company"

@@ -165,6 +165,27 @@ db.exec(`
     FOREIGN KEY (auditor_id) REFERENCES users(id)
   );
 
+  CREATE TABLE IF NOT EXISTS policy_items (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id   TEXT NOT NULL,
+    item         TEXT NOT NULL,
+    content      TEXT NOT NULL,
+    status       TEXT DEFAULT '등록',
+    sort_order   INTEGER DEFAULT 0,
+    created_at   TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (company_id) REFERENCES companies(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS policy_files (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id    TEXT NOT NULL,
+    filename      TEXT NOT NULL,
+    original_name TEXT NOT NULL,
+    size          INTEGER,
+    uploaded_at   TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (company_id) REFERENCES companies(id)
+  );
+
   CREATE TABLE IF NOT EXISTS notifications (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id     TEXT NOT NULL,
