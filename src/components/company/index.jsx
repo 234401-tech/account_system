@@ -168,19 +168,12 @@ function HomeTab({ co, cid, checks, pendingAmend, onAmendClick }) {
       <TableWrap>
         <thead><tr>{["비목", "예산(원)", "집행(원)", "잔액(원)", "집행률", "비고"].map((h, i) => <th key={h} style={th(i >= 1 && i <= 4 ? "right" : "left")}>{h}</th>)}</tr></thead>
         <tbody>
-          {useFallback
-            ? BIMOK.map((bm) => {
-                const bb = co.budget[bm.key] || 0, ee = co.exec[bm.key] || 0, rr = rate(ee, bb), over = ee > bb;
-                return <tr key={bm.key}>
-                  <td style={{ ...td(), fontWeight: 600 }}>{bm.key}</td>
-                  <td style={{ ...td("right"), ...numCell }}>{won(bb)}</td>
-                  <td style={{ ...td("right"), ...numCell, fontWeight: 700, color: over ? C.red : C.text }}>{won(ee)}</td>
-                  <td style={{ ...td("right"), ...numCell, color: bb - ee < 0 ? C.red : C.sub }}>{won(bb - ee)}</td>
-                  <td style={{ ...td("right"), ...numCell }}><MiniBar v={rr} color={over ? C.red : rr > 85 ? C.amber : C.green} /> <b style={{ color: over ? C.red : C.text }}>{rr}%</b></td>
-                  <td style={td()}>{over ? <Tag text="초과" color={C.red} /> : ""}</td>
-                </tr>;
-              })
-            : bimokList.map(([bimok, v]) => {
+          {bimokList.length === 0 && (
+            <tr><td colSpan={6} style={{ ...td(), textAlign: "center", color: C.sub, padding: "30px 0" }}>
+              편성된 비목이 없습니다. <b style={{ color: C.blue }}>예산 현황</b> 메뉴에서 비목을 추가해주세요.
+            </td></tr>
+          )}
+          {bimokList.map(([bimok, v]) => {
                 const rr = rate(v.exec, v.budget), over = v.exec > v.budget;
                 return <tr key={bimok}>
                   <td style={{ ...td(), fontWeight: 600 }}>{bimok}</td>
@@ -192,13 +185,13 @@ function HomeTab({ co, cid, checks, pendingAmend, onAmendClick }) {
                 </tr>;
               })
           }
-          <tr style={{ background: "#F8F9FB" }}>
+          {bimokList.length > 0 && <tr style={{ background: "#F8F9FB" }}>
             <td style={{ ...td(), fontWeight: 800 }}>합계</td>
-            <td style={{ ...td("right"), ...numCell, fontWeight: 800 }}>{useFallback ? won(fb) : totB.toLocaleString()}</td>
-            <td style={{ ...td("right"), ...numCell, fontWeight: 800 }}>{useFallback ? won(fe) : totE.toLocaleString()}</td>
-            <td style={{ ...td("right"), ...numCell, fontWeight: 800 }}>{useFallback ? won(fb - fe) : (totB - totE).toLocaleString()}</td>
-            <td style={{ ...td("right"), ...numCell, fontWeight: 800 }}>{dispR}%</td><td style={td()} />
-          </tr>
+            <td style={{ ...td("right"), ...numCell, fontWeight: 800 }}>{bimokList.reduce((a, [, v]) => a + v.budget, 0).toLocaleString()}</td>
+            <td style={{ ...td("right"), ...numCell, fontWeight: 800 }}>{bimokList.reduce((a, [, v]) => a + v.exec, 0).toLocaleString()}</td>
+            <td style={{ ...td("right"), ...numCell, fontWeight: 800 }}>{(bimokList.reduce((a, [, v]) => a + v.budget, 0) - bimokList.reduce((a, [, v]) => a + v.exec, 0)).toLocaleString()}</td>
+            <td style={{ ...td("right"), ...numCell, fontWeight: 800 }}>{totR}%</td><td style={td()} />
+          </tr>}
         </tbody>
       </TableWrap>
     </Panel>
