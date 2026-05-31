@@ -88,23 +88,25 @@ router.delete("/:id/projects/:projectId", adminOrMaster, (req, res) => {
   res.json({ ok: true });
 });
 
-// GET /api/groups/my-projects — 기업 사용자: 내 그룹의 모든 과제
+// GET /api/groups/my-projects — 기업 사용자: 내 그룹의 모든 과제 + 직접 연결된 과제
 router.get("/my-projects", (req, res) => {
   if (req.user.role !== "company") return res.status(403).json({ error: "기업 전용" });
-  const groups = db.prepare("SELECT g.id FROM company_groups g JOIN group_members gm ON g.id = gm.group_id WHERE gm.user_id = ?").all(req.user.id);
-  if (groups.length === 0) {
-    // 그룹 없으면 기존 방식 (단일 과제)
-    if (req.user.companyId) {
-      const co = db.prepare("SELECT * FROM companies WHERE id = ?").get(req.user.companyId);
-      return res.json(co ? [co] : []);
-    }
-    return res.json([]);
-  }
+  const seen = new Set();
   const allProjects = [];
+
+  // 1) 사용자 자신의 단일 과제 (user.company_id)
+  if (req.user.companyId) {
+    const co = db.prepare("SELECT * FROM companies WHERE id = ?").get(req.user.companyId);
+    if (co) { allProjects.push(co); seen.add(co.id); }
+  }
+
+  // 2) 사용자가 속한 그룹의 과제들
+  const groups = db.prepare("SELECT g.id FROM company_groups g JOIN group_members gm ON g.id = gm.group_id WHERE gm.user_id = ?").all(req.user.id);
   for (const g of groups) {
     const projects = db.prepare("SELECT * FROM companies WHERE group_id = ?").all(g.id);
-    allProjects.push(...projects);
+    for (const p of projects) { if (!seen.has(p.id)) { allProjects.push(p); seen.add(p.id); } }
   }
+
   res.json(allProjects.map((c) => ({ ...c, budget: JSON.parse(c.budget), exec: JSON.parse(c.exec_amt) })));
 });
 

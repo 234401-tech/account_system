@@ -214,7 +214,16 @@ export function CompanyPortal({ companyId }) {
       )}
 
       {/* 초기 등록 (발급 직후, 기업이 직접 진행) */}
-      {needsReg && tab === "home" && <InitialRegistration co={co} onDone={(researchers) => { completeRegistration(co.id, researchers); setToast("초기 등록이 완료되었습니다. 집행을 시작할 수 있습니다."); }} />}
+      {needsReg && tab === "home" && <InitialRegistration co={co} onDone={async (researchers) => {
+        try {
+          await completeRegistration(co.id, researchers);
+          setToast("초기 등록이 완료되었습니다. 집행을 시작할 수 있습니다.");
+          setTimeout(() => window.location.reload(), 800);
+        } catch (e) {
+          console.error(e);
+          setToast("초기 등록 실패: " + (e.message || "다시 시도해 주세요"));
+        }
+      }} />}
 
       {/* 과제 현황 */}
       {!needsReg && tab === "home" && <HomeTab co={co} cid={cid} checks={checks} pendingAmend={pendingAmend} onAmendClick={() => setTab("amend")} />}
