@@ -75,7 +75,7 @@ router.put("/:id", (req, res) => {
   const row = db.prepare("SELECT * FROM companies WHERE id = ?").get(req.params.id);
   if (!row) return res.status(404).json({ error: "과제를 찾을 수 없습니다" });
 
-  const { status, budget, exec, period, researchers, bankName, bankAccount, bankHolder } = req.body;
+  const { status, budget, exec, period, researchers, bankName, bankAccount, bankHolder, govtFund, cashFund, inkindFund, name, task, pm, consortium, announce } = req.body;
   if (status) db.prepare("UPDATE companies SET status = ? WHERE id = ?").run(status, req.params.id);
   if (bankName !== undefined) db.prepare("UPDATE companies SET bank_name = ? WHERE id = ?").run(bankName, req.params.id);
   if (bankAccount !== undefined) db.prepare("UPDATE companies SET bank_account = ? WHERE id = ?").run(bankAccount, req.params.id);
@@ -83,6 +83,27 @@ router.put("/:id", (req, res) => {
   if (budget) db.prepare("UPDATE companies SET budget = ? WHERE id = ?").run(JSON.stringify(budget), req.params.id);
   if (exec) db.prepare("UPDATE companies SET exec_amt = ? WHERE id = ?").run(JSON.stringify(exec), req.params.id);
   if (period) db.prepare("UPDATE companies SET period = ? WHERE id = ?").run(period, req.params.id);
+  if (name) db.prepare("UPDATE companies SET name = ? WHERE id = ?").run(name, req.params.id);
+  if (task) db.prepare("UPDATE companies SET task = ? WHERE id = ?").run(task, req.params.id);
+  if (pm) db.prepare("UPDATE companies SET pm = ? WHERE id = ?").run(pm, req.params.id);
+  if (consortium) db.prepare("UPDATE companies SET consortium = ? WHERE id = ?").run(consortium, req.params.id);
+
+  // 재원 변경 시 총사업비 자동 재계산 + budget_tree의 총사업비 row도 재생성
+  if (govtFund !== undefined || cashFund !== undefined || inkindFund !== undefined) {
+    const cur = db.prepare("SELECT govt_fund, cash_fund, inkind_fund FROM companies WHERE id = ?").get(req.params.id);
+    const gf = govtFund !== undefined ? Number(govtFund) || 0 : cur.govt_fund || 0;
+    const cf = cashFund !== undefined ? Number(cashFund) || 0 : cur.cash_fund || 0;
+    const ikf = inkindFund !== undefined ? Number(inkindFund) || 0 : cur.inkind_fund || 0;
+    db.prepare("UPDATE companies SET govt_fund = ?, cash_fund = ?, inkind_fund = ? WHERE id = ?").run(gf, cf, ikf, req.params.id);
+    const total = gf + cf + ikf;
+    db.prepare("UPDATE companies SET budget = ? WHERE id = ?").run(JSON.stringify({ 총사업비: total }), req.params.id);
+    // budget_tree의 총사업비 row만 교체
+    db.prepare("DELETE FROM budget_tree WHERE company_id = ? AND bimok = '총사업비'").run(req.params.id);
+    const ins = db.prepare("INSERT INTO budget_tree (company_id,bimok,semok,sse,gwamok,budget,exec_amt,fund_source) VALUES (?,?,?,?,?,?,?,?)");
+    if (gf > 0) ins.run(req.params.id, "총사업비", "기업지원비", "기업지원비", "", gf, 0, "기업지원비");
+    if (cf > 0) ins.run(req.params.id, "총사업비", "민간현금", "민간부담금(현금)", "", cf, 0, "민간현금");
+    if (ikf > 0) ins.run(req.params.id, "총사업비", "민간현물", "민간부담금(현물)", "", ikf, 0, "민간현물");
+  }
 
   if (researchers) {
     db.prepare("DELETE FROM researchers WHERE company_id = ?").run(req.params.id);

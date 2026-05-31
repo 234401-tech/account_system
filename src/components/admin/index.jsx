@@ -53,11 +53,17 @@ function getNextGBId(companies) {
 }
 
 function ProjectEditForm({ project, onSave, onCancel }) {
-  const [f, setF] = useState({ name: project.name || "", announce: project.announce || "", task: project.task || "", pm: project.pm || "", consortium: project.consortium || "", period: project.period || "", status: project.status || "초기등록" });
+  const [f, setF] = useState({
+    name: project.name || "", announce: project.announce || "", task: project.task || "", pm: project.pm || "",
+    consortium: project.consortium || "", period: project.period || "", status: project.status || "초기등록",
+    govtFund: project.govtFund || 0, cashFund: project.cashFund || 0, inkindFund: project.inkindFund || 0,
+  });
   const lbl = { background: "#F8F9FB", padding: "10px 14px", fontSize: 12.5, fontWeight: 700, color: C.text, borderRight: `1px solid ${C.lineSoft}`, display: "flex", alignItems: "center" };
   const row = { display: "grid", gridTemplateColumns: "120px 1fr", borderBottom: `1px solid ${C.lineSoft}` };
   const cl = { padding: "8px 14px", display: "flex", alignItems: "center", gap: 8 };
   const wide = { ...inp, width: "100%", maxWidth: 400 };
+  const numInp = { ...inp, width: 200, textAlign: "right", ...numCell };
+  const total = (Number(f.govtFund) || 0) + (Number(f.cashFund) || 0) + (Number(f.inkindFund) || 0);
   return <div>
     <div style={{ border: `1px solid ${C.line}`, borderRadius: 4, overflow: "hidden" }}>
       <div style={row}><div style={lbl}>기업명</div><div style={cl}><input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} style={wide} /></div></div>
@@ -66,6 +72,10 @@ function ProjectEditForm({ project, onSave, onCancel }) {
       <div style={row}><div style={lbl}>연구책임자</div><div style={cl}><input value={f.pm} onChange={(e) => setF({ ...f, pm: e.target.value })} style={{ ...inp, width: 160 }} /></div></div>
       <div style={row}><div style={lbl}>회사명</div><div style={cl}><input value={f.consortium} onChange={(e) => setF({ ...f, consortium: e.target.value })} style={{ ...inp, width: 200 }} /></div></div>
       <div style={row}><div style={lbl}>협약기간</div><div style={cl}><input value={f.period} onChange={(e) => setF({ ...f, period: e.target.value })} style={{ ...inp, width: 280 }} /></div></div>
+      <div style={row}><div style={lbl}>기업지원비(원)</div><div style={cl}><input value={Number(f.govtFund || 0).toLocaleString()} onChange={(e) => setF({ ...f, govtFund: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} style={numInp} /></div></div>
+      <div style={row}><div style={lbl}>민간부담금(현금)</div><div style={cl}><input value={Number(f.cashFund || 0).toLocaleString()} onChange={(e) => setF({ ...f, cashFund: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} style={numInp} /></div></div>
+      <div style={row}><div style={lbl}>민간부담금(현물)</div><div style={cl}><input value={Number(f.inkindFund || 0).toLocaleString()} onChange={(e) => setF({ ...f, inkindFund: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} style={numInp} /></div></div>
+      <div style={row}><div style={lbl}>총사업비(자동)</div><div style={cl}><div style={{ ...numInp, background: "#F8F9FB", fontWeight: 800, color: C.navy }}>{total.toLocaleString()}</div></div></div>
       <div style={{ ...row, borderBottom: "none" }}><div style={lbl}>상태</div><div style={cl}><select value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })} style={inp}><option>초기등록</option><option>집행중</option><option>집행마감</option><option>검토중</option><option>보완요청</option><option>정산확정</option></select></div></div>
     </div>
     <div style={{ display: "flex", justifyContent: "flex-end", gap: 7, marginTop: 10 }}>
@@ -239,29 +249,35 @@ export function IssueBoard() {
     {/* 과제 편집 */}
     {mode === "edit" && editProject && <Panel title={`과제 수정 — ${editProject.name}`} sub={editProject.id}>
       <ProjectEditForm project={editProject} onSave={async (updated) => {
-        
-        await a.updateCompany(editProject.id, updated);
-        setToast("과제가 수정되었습니다.");
-        setMode("single"); setEditProject(null);
-        const { refreshCompanies: rc } = await import("../../context/AppContext.jsx").then(m => ({ refreshCompanies: null }));
-        window.location.reload();
+        try {
+          await api.updateCompany(editProject.id, updated);
+          setToast("과제가 수정되었습니다.");
+          setMode("single"); setEditProject(null);
+          setTimeout(() => window.location.reload(), 600);
+        } catch (e) {
+          setToast("수정 실패: " + e.message);
+        }
       }} onCancel={() => { setMode("single"); setEditProject(null); }} />
     </Panel>}
 
     <Panel title="발급 완료 과제" sub="초기등록 대기 · 기업 등록 예정" pad={false}>
       <TableWrap>
-        <thead><tr>{["과제번호", "기업명", "사업명 / 과제명", "회사명", "구분", "사업비(원)", "협약기간", "상태", ""].map((h, i) => <th key={h} style={th(i === 5 ? "right" : "left")}>{h}</th>)}</tr></thead>
+        <thead><tr>{["과제번호", "기업명", "사업명 / 과제명", "회사명", "구분", "기업지원비", "민간현금", "민간현물", "총사업비", "협약기간", "상태", ""].map((h, i) => <th key={h} style={th(i >= 5 && i <= 8 ? "right" : "left")}>{h}</th>)}</tr></thead>
         <tbody>
-          {issued.length === 0 && <tr><td style={{ ...td(), textAlign: "center", color: C.sub }} colSpan={8}>초기등록 대기 중인 과제가 없습니다.</td></tr>}
+          {issued.length === 0 && <tr><td style={{ ...td(), textAlign: "center", color: C.sub }} colSpan={12}>초기등록 대기 중인 과제가 없습니다.</td></tr>}
           {issued.map((c) => {
-            const bt = Object.values(c.budget).reduce((a, v) => a + v, 0);
+            const govt = c.govtFund || 0, cash = c.cashFund || 0, inkind = c.inkindFund || 0;
+            const bt = govt + cash + inkind || Object.values(c.budget || {}).reduce((a, v) => a + v, 0);
             return <tr key={c.id}>
             <td style={{ ...td(), ...numCell, color: C.sub }}>{c.id}</td>
             <td style={{ ...td(), fontWeight: 700 }}>{c.name}</td>
             <td style={td()}><div style={{ fontWeight: 600 }}>{c.announce || ""}</div><div style={{ fontSize: 11.5, color: C.sub }}>{c.task}</div></td>
             <td style={td()}>{c.consortium}</td>
             <td style={td()}><Tag text={c.consortiumRole || "주관"} color={(c.consortiumRole || "주관") === "참여" ? C.teal : C.blue} /></td>
-            <td style={{ ...td("right"), ...numCell, fontWeight: 700 }}>{bt.toLocaleString()}</td>
+            <td style={{ ...td("right"), ...numCell, color: C.blue }}>{govt.toLocaleString()}</td>
+            <td style={{ ...td("right"), ...numCell, color: C.green }}>{cash.toLocaleString()}</td>
+            <td style={{ ...td("right"), ...numCell, color: C.amber }}>{inkind.toLocaleString()}</td>
+            <td style={{ ...td("right"), ...numCell, fontWeight: 800 }}>{bt.toLocaleString()}</td>
             <td style={{ ...td(), ...numCell }}>{c.period}</td>
             <td style={td()}><Status s={c.status} /></td>
             <td style={td()}>
