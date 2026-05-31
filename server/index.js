@@ -39,7 +39,8 @@ app.get("/api/health", (_req, res) => res.json({ ok: true, time: new Date().toIS
 // 프로덕션: 빌드된 프론트엔드 정적 서빙
 const distPath = join(__dirname, "..", "dist");
 if (existsSync(distPath)) {
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, { etag: false, maxAge: 0 }));
+  app.use((_req, res, next) => { res.set("Cache-Control", "no-store"); next(); });
   app.get("*", (_req, res) => res.sendFile(join(distPath, "index.html")));
   console.log("  프론트엔드: dist/ 정적 서빙 활성화");
 }
