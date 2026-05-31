@@ -214,9 +214,9 @@ export function CompanyPortal({ companyId }) {
       )}
 
       {/* 초기 등록 (발급 직후, 기업이 직접 진행) */}
-      {needsReg && tab === "home" && <InitialRegistration co={co} onDone={async (researchers) => {
+      {needsReg && tab === "home" && <InitialRegistration co={co} onDone={async (researchers, acctInfo) => {
         try {
-          await completeRegistration(co.id, researchers);
+          await completeRegistration(co.id, researchers, acctInfo);
           setToast("초기 등록이 완료되었습니다. 집행을 시작할 수 있습니다.");
           setTimeout(() => window.location.reload(), 800);
         } catch (e) {
@@ -1132,7 +1132,7 @@ export function InitialRegistration({ co, onDone }) {
 
     <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12 }}>
       {!valid && <span style={{ fontSize: 12.5, color: C.sub }}>참여연구원 1명 이상 등록 및 사업비 계좌 등록을 완료하세요.</span>}
-      <Btn kind="primary" disabled={!valid} onClick={() => { onDone(people.filter((p) => p.name)); clearStorage(); }}><Check size={14} /> 초기 등록 완료 · 집행 개시</Btn>
+      <Btn kind="primary" disabled={!valid} onClick={() => { onDone(people.filter((p) => p.name), acctInfo); clearStorage(); }}><Check size={14} /> 초기 등록 완료 · 집행 개시</Btn>
     </div>
   </>;
 }
@@ -1186,6 +1186,8 @@ export function CompanyLogin({ companies, onLogin }) {
 const MOCK_MONTHS = ["2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10", "2026-11", "2026-12"];
 
 export function BankManager({ companyId }) {
+  const { companies } = useApp();
+  const co = companies.find((c) => c.id === companyId);
   const [bookImg, setBookImg] = useState(null);
   const [bookPreview, setBookPreview] = useState(null);
   const bookRef = useRef(null);
@@ -1266,7 +1268,7 @@ export function BankManager({ companyId }) {
         <div style={{ flex: 1, minWidth: 240 }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: C.text }}>계좌 정보</div>
           <div style={{ border: `1px solid ${C.line}`, borderRadius: 4, overflow: "hidden" }}>
-            {[["은행", "농협은행"], ["계좌번호", "301-0000-0000-13"], ["예금주", "(주)뉴로메카"], ["용도", "사업비 전용계좌"]].map(([label, val], i, arr) => (
+            {[["은행", co?.bankName || "-"], ["계좌번호", co?.bankAccount || "-"], ["예금주", co?.bankHolder || "-"], ["용도", "사업비 전용계좌"]].map(([label, val], i, arr) => (
               <div key={label} style={{ display: "grid", gridTemplateColumns: "100px 1fr", borderBottom: i < arr.length - 1 ? `1px solid ${C.lineSoft}` : "none" }}>
                 <div style={{ background: "#F8F9FB", padding: "9px 12px", fontSize: 12.5, fontWeight: 700, color: C.text, borderRight: `1px solid ${C.lineSoft}` }}>{label}</div>
                 <div style={{ padding: "9px 12px", fontSize: 13, color: C.text }}>{val}</div>

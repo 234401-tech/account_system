@@ -15,8 +15,14 @@ export const listCompanies = () => http_get("/api/companies");
 export const getCompany = (id) => http_get(`/api/companies/${id}`);
 export const issueCompany = (proj) => http_post("/api/companies", proj);
 export const updateCompany = (id, patch) => http_put(`/api/companies/${id}`, patch);
-export const completeRegistration = (id, researchers) =>
-  http_put(`/api/companies/${id}`, { researchers, status: "집행중" });
+export const completeRegistration = (id, researchers, acctInfo) =>
+  http_put(`/api/companies/${id}`, {
+    researchers,
+    status: "집행중",
+    bankName: acctInfo?.bank || acctInfo?.bankName,
+    bankAccount: acctInfo?.account || acctInfo?.bankAccount,
+    bankHolder: acctInfo?.holder || acctInfo?.bankHolder,
+  });
 export const nextCompanyId = () => http_get("/api/companies/_next-id").then(r => r.id);
 export const deleteCompany = (id) => http_del(`/api/companies/${id}`);
 

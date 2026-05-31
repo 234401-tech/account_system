@@ -8,7 +8,15 @@ router.use(authMiddleware);
 function companyRow(row) {
   const researchers = db.prepare("SELECT * FROM researchers WHERE company_id = ?").all(row.id)
     .map(r => ({ ...r, salary: !!r.salary }));
-  return { ...row, budget: JSON.parse(row.budget), exec: JSON.parse(row.exec_amt), researchers };
+  return {
+    ...row,
+    budget: JSON.parse(row.budget),
+    exec: JSON.parse(row.exec_amt),
+    researchers,
+    bankName: row.bank_name || "",
+    bankAccount: row.bank_account || "",
+    bankHolder: row.bank_holder || "",
+  };
 }
 
 // GET /api/companies
@@ -51,8 +59,11 @@ router.put("/:id", (req, res) => {
   const row = db.prepare("SELECT * FROM companies WHERE id = ?").get(req.params.id);
   if (!row) return res.status(404).json({ error: "과제를 찾을 수 없습니다" });
 
-  const { status, budget, exec, period, researchers } = req.body;
+  const { status, budget, exec, period, researchers, bankName, bankAccount, bankHolder } = req.body;
   if (status) db.prepare("UPDATE companies SET status = ? WHERE id = ?").run(status, req.params.id);
+  if (bankName !== undefined) db.prepare("UPDATE companies SET bank_name = ? WHERE id = ?").run(bankName, req.params.id);
+  if (bankAccount !== undefined) db.prepare("UPDATE companies SET bank_account = ? WHERE id = ?").run(bankAccount, req.params.id);
+  if (bankHolder !== undefined) db.prepare("UPDATE companies SET bank_holder = ? WHERE id = ?").run(bankHolder, req.params.id);
   if (budget) db.prepare("UPDATE companies SET budget = ? WHERE id = ?").run(JSON.stringify(budget), req.params.id);
   if (exec) db.prepare("UPDATE companies SET exec_amt = ? WHERE id = ?").run(JSON.stringify(exec), req.params.id);
   if (period) db.prepare("UPDATE companies SET period = ? WHERE id = ?").run(period, req.params.id);

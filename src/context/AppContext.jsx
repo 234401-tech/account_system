@@ -69,9 +69,9 @@ export function AppProvider({ children }) {
     setCompanies((cs) => [...cs, proj]);
   };
 
-  const completeRegistration = async (id, researchers) => {
-    await api.completeRegistration(id, researchers);
-    setCompanies((cs) => cs.map((c) => (c.id === id ? { ...c, researchers, status: "집행중" } : c)));
+  const completeRegistration = async (id, researchers, acctInfo) => {
+    await api.completeRegistration(id, researchers, acctInfo);
+    setCompanies((cs) => cs.map((c) => (c.id === id ? { ...c, researchers, status: "집행중", bankName: acctInfo?.bank, bankAccount: acctInfo?.account, bankHolder: acctInfo?.holder } : c)));
   };
 
   const decideAmendment = async (id, decision, comment) => {
