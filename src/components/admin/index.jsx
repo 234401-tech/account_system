@@ -5,6 +5,7 @@ import { downloadXlsx, parseXlsx } from "../../lib/xlsx.js";
 import { sum, won, eok, rate } from "../../lib/format.js";
 import { runChecks } from "../../lib/checks.js";
 import { useApp } from "../../context/AppContext.jsx";
+import { api } from "../../api/index.js";
 import { Shell } from "../common/Shell.jsx";
 import { th, td, numCell, inp, Tag, Status, Btn, Panel, Breadcrumb, PageHead, SearchBox, Field, Kpi, Toast, MiniBar, TableWrap, InfoBar } from "../common/ui.jsx";
 import { AmendDiff, BankManager } from "../company/index.jsx";
@@ -224,7 +225,7 @@ export function IssueBoard() {
     {/* 과제 편집 */}
     {mode === "edit" && editProject && <Panel title={`과제 수정 — ${editProject.name}`} sub={editProject.id}>
       <ProjectEditForm project={editProject} onSave={async (updated) => {
-        const { api: a } = await import("../../api/index.js");
+        
         await a.updateCompany(editProject.id, updated);
         setToast("과제가 수정되었습니다.");
         setMode("single"); setEditProject(null);
@@ -475,7 +476,7 @@ export function ReviewDetail({ coId, onClose }) {
   };
 
   const markReviewed = async (txnId) => {
-    await (await import("../../api/index.js")).api.reviewEvidence(txnId);
+    await api.reviewEvidence(txnId);
     loadLedger(coId);
   };
 
@@ -650,7 +651,7 @@ export function AuditAdmin() {
 
   const loadAuditData = async () => {
     try {
-      const { api } = await import("../../api/index.js");
+      
       const [auds, asns, reps] = await Promise.all([api.listAuditors(), api.getAssignments(), api.listAuditReports()]);
       setAuditors(auds);
       setAssignments(asns);
@@ -663,7 +664,7 @@ export function AuditAdmin() {
 
   const createAuditor = async () => {
     if (!newAud.name || !newAud.email || !newAud.password) return;
-    const { api } = await import("../../api/index.js");
+    
     await api.createAuditor(newAud);
     setNewAud({ name: "", email: "", password: "" });
     setToast("회계사가 등록되었습니다.");
@@ -671,7 +672,7 @@ export function AuditAdmin() {
   };
 
   const saveAssignments = async () => {
-    const { api } = await import("../../api/index.js");
+    
     const list = Object.entries(localAssign).map(([companyId, auditorId]) => ({ companyId, auditorId }));
     await api.saveAssignments(list);
     setToast("배정이 저장되었습니다.");
@@ -846,7 +847,7 @@ export function UserAdmin() {
 
   const loadUsers = async () => {
     try {
-      const { api } = await import("../../api/index.js");
+      
       const [us, srs] = await Promise.all([api.listUsers(), api.listSignupRequests()]);
       setUsers(us);
       setSignups(srs.filter((s) => s.status === "대기"));
@@ -855,7 +856,7 @@ export function UserAdmin() {
 
   const createUser = async () => {
     if (!newUser.name || !newUser.email || !newUser.password) return;
-    const { api } = await import("../../api/index.js");
+    
     await api.createUser(newUser);
     setToast("계정이 생성되었습니다.");
     setNewUser({ name: "", email: "", password: "", role: "company", companyId: "" });
@@ -864,14 +865,14 @@ export function UserAdmin() {
 
   const deleteUser = async (id) => {
     if (!confirm("정말 삭제하시겠습니까?")) return;
-    const { api } = await import("../../api/index.js");
+    
     await api.deleteUser(id);
     setToast("계정이 삭제되었습니다.");
     loadUsers();
   };
 
   const approveSignup = async (id, companyId) => {
-    const { api } = await import("../../api/index.js");
+    
     await api.approveSignup(id, companyId);
     setToast("가입이 승인되었습니다.");
     loadUsers();
@@ -880,12 +881,12 @@ export function UserAdmin() {
   const resetPw = async (userId, name) => {
     const newPw = prompt(`${name} 비밀번호를 초기화합니다. 새 비밀번호:`);
     if (!newPw) return;
-    const { api } = await import("../../api/index.js");
+    
     try { await api.resetPassword(userId, newPw); setToast(`${name} 비밀번호가 초기화되었습니다.`); } catch (e) { setToast("실패: " + e.message); }
   };
 
   const rejectSignup = async (id) => {
-    const { api } = await import("../../api/index.js");
+    
     await api.rejectSignup(id);
     setToast("가입이 반려되었습니다.");
     loadUsers();
@@ -922,11 +923,11 @@ export function UserAdmin() {
                 <td style={{ ...td(), fontWeight: 700 }}>{u.name}</td>
                 <td style={{ ...td(), color: C.sub }}>{u.email}</td>
                 <td style={td()}>{u.role === "master" ? <Tag text="마스터 관리자" color={C.red} /> :
-                  <select value={u.role} onChange={async (e) => { const { api } = await import("../../api/index.js"); await api.updateUser(u.id, { role: e.target.value }); setToast(`${u.name} 역할이 변경되었습니다.`); loadUsers(); }} style={{ ...inp, padding: "3px 8px", fontSize: 12, fontWeight: 700, color: roleColor[u.role], borderColor: roleColor[u.role] }}>
+                  <select value={u.role} onChange={async (e) => { await api.updateUser(u.id, { role: e.target.value }); setToast(`${u.name} 역할이 변경되었습니다.`); loadUsers(); }} style={{ ...inp, padding: "3px 8px", fontSize: 12, fontWeight: 700, color: roleColor[u.role], borderColor: roleColor[u.role] }}>
                     <option value="company">기업</option><option value="admin">기관관리자</option><option value="auditor">회계사</option>
                   </select>}</td>
                 <td style={td()}>{u.role === "company"
-                  ? <select value={u.company_id || ""} onChange={async (e) => { const { api: a } = await import("../../api/index.js"); await a.updateUser(u.id, { companyId: e.target.value || null }); setToast(`${u.name} 과제가 연결되었습니다.`); loadUsers(); }} style={{ ...inp, padding: "3px 6px", fontSize: 11, minWidth: 120 }}>
+                  ? <select value={u.company_id || ""} onChange={async (e) => { await api.updateUser(u.id, { companyId: e.target.value || null }); setToast(`${u.name} 과제가 연결되었습니다.`); loadUsers(); }} style={{ ...inp, padding: "3px 6px", fontSize: 11, minWidth: 120 }}>
                     <option value="">미연결</option>
                     {companies.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.id})</option>)}
                   </select>
