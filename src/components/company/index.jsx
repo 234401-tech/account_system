@@ -606,15 +606,41 @@ export function BudgetSheet({ companyId }) {
   const totB = rows.reduce((a, r) => a + (r.budget || 0), 0);
   const totE = rows.reduce((a, r) => a + (r.exec_amt || r.exec || 0), 0);
   const set = (id, k, v) => setLocalRows(rows.map((r) => r._id === id ? { ...r, [k]: v } : r));
-  const addRow = () => setLocalRows([...rows, { _id: "B" + Date.now(), bimok: "운영비", semok: "", sse: "", gwamok: "", budget: 0, exec_amt: 0 }]);
-  const del = (id) => setLocalRows(rows.filter((r) => r._id !== id));
+  const groupKey = (r) => r._group || r.bimok || "";
 
-  // 비목별 그룹(소계용) — ICT 기금규정 비목 순서
-  const groupsMap = rows.reduce((a, r) => { (a[r.bimok] = a[r.bimok] || []).push(r); return a; }, {});
-  const groups = Object.entries(groupsMap).sort(([a], [b]) => {
-    const ia = BIMOK_ORDER.indexOf(a), ib = BIMOK_ORDER.indexOf(b);
+  // 비목 추가: 빈 비목 그룹 생성. _group으로 격리되어 다른 빈 그룹과 안 합쳐짐
+  const addBimok = () => {
+    const gk = "G" + Date.now();
+    setLocalRows([...rows, { _id: "B" + Date.now(), _group: gk, bimok: "", semok: "", sse: "", gwamok: "", budget: 0, exec_amt: 0 }]);
+  };
+  // 세목 추가: 같은 비목 그룹에 새 행 추가
+  const addSemok = (gk) => {
+    const ref = rows.find((r) => groupKey(r) === gk);
+    if (!ref) return;
+    setLocalRows([...rows, { _id: "B" + Date.now(), _group: ref._group, bimok: ref.bimok, semok: "", sse: "", gwamok: "", budget: 0, exec_amt: 0 }]);
+  };
+  // 비목명 변경: 같은 그룹의 모든 행에 일괄 적용
+  const setBimokName = (gk, newName) => {
+    setLocalRows(rows.map((r) => groupKey(r) === gk ? { ...r, bimok: newName } : r));
+  };
+  const del = (id) => setLocalRows(rows.filter((r) => r._id !== id));
+  // 비목 그룹 통째 삭제
+  const delBimok = (gk) => {
+    if (!confirm("이 비목 전체를 삭제하시겠습니까?")) return;
+    setLocalRows(rows.filter((r) => groupKey(r) !== gk));
+  };
+
+  // 비목별 그룹 — _group 또는 bimok명 기준
+  const groupsMap = rows.reduce((a, r) => {
+    const gk = groupKey(r);
+    if (!a[gk]) a[gk] = { bimok: r.bimok || "", items: [] };
+    a[gk].items.push(r);
+    return a;
+  }, {});
+  const groups = Object.entries(groupsMap).sort(([_, ga], [__, gb]) => {
+    const ia = BIMOK_ORDER.indexOf(ga.bimok), ib = BIMOK_ORDER.indexOf(gb.bimok);
     return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
-  }).reduce((a, [k, v]) => { a[k] = v; return a; }, {});
+  });
 
   const getExec = (r) => r.exec_amt || r.exec || 0;
   const onUpload = (raw) => {
@@ -631,7 +657,7 @@ export function BudgetSheet({ companyId }) {
         <Btn kind="default" sm onClick={() => ref.current && ref.current.click()}><Upload size={13} /> 엑셀 업로드</Btn>
         <Btn kind="default" sm onClick={download}><Download size={13} /> 내보내기</Btn>
         <input ref={ref} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) parseXlsx(f, (rws) => { onUpload(rws); e.target.value = ""; }); }} />
-        <Btn kind="primary" sm onClick={addRow}><PlusCircle size={13} /> 항목 추가</Btn>
+        <Btn kind="primary" sm onClick={addBimok}><PlusCircle size={13} /> 비목 추가</Btn>
       </div>} />
 
     <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 14 }}>
@@ -645,22 +671,30 @@ export function BudgetSheet({ companyId }) {
       <TableWrap>
         <thead><tr>{["비목", "세목", "세세목", "예산(원)", "집행(원)", "잔액(원)", "집행률", ""].map((h, i) => <th key={h} style={th(i >= 3 && i <= 6 ? "right" : "left")}>{h}</th>)}</tr></thead>
         <tbody>
-          {Object.entries(groups).map(([bimok, items]) => {
+          {groups.map(([gk, group]) => {
+            const items = group.items;
             const gb = items.reduce((a, x) => a + (x.budget || 0), 0), ge = items.reduce((a, x) => a + getExec(x), 0), grr = rate(ge, gb);
-            return <React.Fragment key={bimok}>
+            return <React.Fragment key={gk}>
               <tr style={{ background: C.blueLt }}>
-                <td style={{ ...td(), fontWeight: 800, color: C.blueDk }}>{bimok}</td><td style={td()} colSpan={2} />
+                <td style={{ ...td(), fontWeight: 800, color: C.blueDk }}>
+                  <input value={group.bimok} onChange={(e) => setBimokName(gk, e.target.value)} placeholder="비목명 입력"
+                    style={{ ...inp, fontWeight: 800, color: C.blueDk, background: "transparent", border: `1px solid transparent`, padding: "4px 6px", width: 130 }} />
+                </td>
+                <td style={td()} colSpan={2}>
+                  <Btn kind="default" sm onClick={() => addSemok(gk)}><PlusCircle size={11} /> 세목 추가</Btn>
+                </td>
                 <td style={{ ...td("right"), ...numCell, fontWeight: 800 }}>{gb.toLocaleString()}</td>
                 <td style={{ ...td("right"), ...numCell, fontWeight: 800, color: ge > gb ? C.red : C.text }}>{ge.toLocaleString()}</td>
                 <td style={{ ...td("right"), ...numCell, fontWeight: 800, color: gb - ge < 0 ? C.red : C.text }}>{(gb - ge).toLocaleString()}</td>
-                <td style={{ ...td("right"), ...numCell, fontWeight: 800, color: grr > 100 ? C.red : C.text }}>{grr}%</td><td style={td()} />
+                <td style={{ ...td("right"), ...numCell, fontWeight: 800, color: grr > 100 ? C.red : C.text }}>{grr}%</td>
+                <td style={td()}><button onClick={() => delBimok(gk)} title="비목 전체 삭제" style={{ border: "none", background: "none", cursor: "pointer", color: C.faint }}><Trash2 size={13} /></button></td>
               </tr>
               {items.map((row) => {
                 const ex = getExec(row), rem = (row.budget || 0) - ex, rr = rate(ex, row.budget), over = rr > 100;
                 return <tr key={row._id}>
                   <td style={td()} />
-                  <td style={td()}><input value={row.semok} onChange={(e) => set(row._id, "semok", e.target.value)} style={{ ...inp, width: 120, border: "1px solid transparent", background: "transparent" }} /></td>
-                  <td style={td()}><input value={row.sse} onChange={(e) => set(row._id, "sse", e.target.value)} style={{ ...inp, width: 280, border: "1px solid transparent", background: "transparent" }} /></td>
+                  <td style={td()}><input value={row.semok} onChange={(e) => set(row._id, "semok", e.target.value)} placeholder="세목" style={{ ...inp, width: 120, border: "1px solid transparent", background: "transparent" }} /></td>
+                  <td style={td()}><input value={row.sse} onChange={(e) => set(row._id, "sse", e.target.value)} placeholder="세세목" style={{ ...inp, width: 280, border: "1px solid transparent", background: "transparent" }} /></td>
                   <td style={td("right")}><input value={(row.budget || 0).toLocaleString()} onChange={(e) => set(row._id, "budget", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} style={{ ...inp, width: 130, textAlign: "right", ...numCell }} /></td>
                   <td style={{ ...td("right"), ...numCell, fontWeight: 700, color: over ? C.red : C.text }}>{ex.toLocaleString()}</td>
                   <td style={{ ...td("right"), ...numCell, color: rem < 0 ? C.red : C.sub }}>{rem.toLocaleString()}</td>
