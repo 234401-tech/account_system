@@ -210,6 +210,18 @@ export const getAmendmentTimeline = (companyId) => {
   return delay(events);
 };
 
+// --- 기업그룹 ---
+let groups = [];
+export const listGroups = () => delay([...groups]);
+export const createGroup = (data) => { const g = { id: `GRP-${Date.now()}`, ...data, members: [], projects: [] }; groups.push(g); return delay(g); };
+export const updateGroup = (id, data) => { groups = groups.map((g) => g.id === id ? { ...g, ...data } : g); return delay({ ok: true }); };
+export const deleteGroup = (id) => { groups = groups.filter((g) => g.id !== id); return delay({ ok: true }); };
+export const addGroupMember = (gid, uid) => delay({ ok: true });
+export const removeGroupMember = (gid, uid) => delay({ ok: true });
+export const addGroupProject = (gid, pid) => delay({ ok: true });
+export const removeGroupProject = (gid, pid) => delay({ ok: true });
+export const getMyProjects = () => delay(companies.map((c) => ({ ...c })));
+
 // --- 알림 ---
 let mockNotifications = [];
 export const listNotifications = () => delay([...mockNotifications]);

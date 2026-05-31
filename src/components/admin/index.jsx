@@ -24,6 +24,7 @@ export function AdminApp() {
     { k: "tasks", label: "지원기업·과제", icon: Building2 },
     { k: "amend", label: "협약변경 검토", icon: ClipboardCheck, badge: pendingAmend },
     { k: "review", label: "사업비 집행 검토", icon: ClipboardList },
+    { k: "groups", label: "기업그룹 관리", icon: Building2 },
     { k: "audit", label: "회계검토", icon: ScanSearch },
     { k: "users", label: "회원관리", icon: Users },
   ];
@@ -37,6 +38,7 @@ export function AdminApp() {
       {tab === "issue" && <IssueBoard />}
       {tab === "amend" && <AmendReview />}
       {tab === "review" && (sel ? <ReviewDetail coId={sel} onClose={() => setSel(null)} /> : <TaskList onPick={pick} />)}
+      {tab === "groups" && <GroupAdmin />}
       {tab === "audit" && <AuditAdmin />}
       {tab === "users" && <UserAdmin />}
     </Shell>
@@ -630,6 +632,157 @@ export function ReviewDetail({ coId, onClose }) {
     {tab === "bank" && <BankManager companyId={coId} />}
 
     <div style={{ display: "flex", gap: 7, marginTop: 14 }}><Btn kind="primary">정산 확정</Btn><Btn kind="warn">보완 요청 (메일)</Btn>{checks.some((f) => f.sev === "high") && <Btn kind="danger">환수 산정</Btn>}</div>
+  </>;
+}
+
+/* ═══════════ 기업그룹 관리 ═══════════ */
+
+export function GroupAdmin() {
+  const { companies } = useApp();
+  const [groups, setGroups] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [toast, setToast] = useState("");
+  const [newGroup, setNewGroup] = useState({ name: "", bizNo: "" });
+  const [openGroup, setOpenGroup] = useState(null);
+  const [addMemberId, setAddMemberId] = useState("");
+  const [addProjectId, setAddProjectId] = useState("");
+
+  useEffect(() => { loadGroups(); }, []);
+  useEffect(() => { if (toast) { const t = setTimeout(() => setToast(""), 3000); return () => clearTimeout(t); } }, [toast]);
+
+  const loadGroups = async () => {
+    try {
+      const [gs, us] = await Promise.all([api.listGroups(), api.listUsers()]);
+      setGroups(gs);
+      setUsers(us.filter((u) => u.role === "company"));
+    } catch (e) { console.error(e); }
+  };
+
+  const create = async () => {
+    if (!newGroup.name) return;
+    await api.createGroup(newGroup);
+    setNewGroup({ name: "", bizNo: "" });
+    setToast("기업그룹이 생성되었습니다.");
+    loadGroups();
+  };
+
+  const delGroup = async (id) => {
+    if (!confirm("기업그룹을 삭제하시겠습니까?")) return;
+    await api.deleteGroup(id);
+    setToast("삭제되었습니다.");
+    loadGroups();
+  };
+
+  const addMember = async (groupId) => {
+    if (!addMemberId) return;
+    await api.addGroupMember(groupId, addMemberId, "담당자");
+    setAddMemberId("");
+    setToast("담당자가 추가되었습니다.");
+    loadGroups();
+  };
+
+  const removeMember = async (groupId, userId) => {
+    await api.removeGroupMember(groupId, userId);
+    setToast("담당자가 제거되었습니다.");
+    loadGroups();
+  };
+
+  const addProject = async (groupId) => {
+    if (!addProjectId) return;
+    await api.addGroupProject(groupId, addProjectId);
+    setAddProjectId("");
+    setToast("과제가 연결되었습니다.");
+    loadGroups();
+  };
+
+  const removeProject = async (groupId, projectId) => {
+    await api.removeGroupProject(groupId, projectId);
+    setToast("과제 연결이 해제되었습니다.");
+    loadGroups();
+  };
+
+  // 이미 그룹에 속한 과제 ID들
+  const assignedProjectIds = groups.flatMap((g) => (g.projects || []).map((p) => p.id));
+  const unassignedProjects = companies.filter((c) => !assignedProjectIds.includes(c.id));
+
+  return <>
+    <PageHead title="기업그룹 관리" />
+
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 14 }}>
+      <Kpi label="기업그룹" value={groups.length} unit="개" accent={C.blue} />
+      <Kpi label="연결된 과제" value={assignedProjectIds.length} unit="개" accent={C.green} />
+      <Kpi label="미연결 과제" value={unassignedProjects.length} unit="개" accent={unassignedProjects.length > 0 ? C.amber : C.gray} />
+    </div>
+
+    {/* 그룹 생성 */}
+    <Panel title="기업그룹 생성">
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+        <div><div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>기업명 *</div><input value={newGroup.name} onChange={(e) => setNewGroup({ ...newGroup, name: e.target.value })} placeholder="(주)○○테크" style={{ ...inp, width: 200 }} /></div>
+        <div><div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>사업자번호</div><input value={newGroup.bizNo} onChange={(e) => setNewGroup({ ...newGroup, bizNo: e.target.value })} placeholder="123-45-67890" style={{ ...inp, width: 160 }} /></div>
+        <Btn kind="primary" disabled={!newGroup.name} onClick={create}><Check size={13} /> 생성</Btn>
+      </div>
+    </Panel>
+
+    {/* 그룹 목록 */}
+    {groups.map((g) => (
+      <Panel key={g.id} title={g.name} sub={g.biz_no || g.bizNo || ""} extra={
+        <div style={{ display: "flex", gap: 6 }}>
+          <Btn kind="default" sm onClick={() => setOpenGroup(openGroup === g.id ? null : g.id)}>{openGroup === g.id ? "닫기" : "관리"}</Btn>
+          <Btn kind="danger" sm onClick={() => delGroup(g.id)}><Trash2 size={11} /></Btn>
+        </div>
+      } pad={openGroup === g.id}>
+        {openGroup === g.id && <>
+          {/* 담당자 */}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>담당자</div>
+            {(g.members || []).length > 0 && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+              {g.members.map((m) => (
+                <div key={m.user_id} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 10px", border: `1px solid ${C.line}`, borderRadius: 4, background: "#FAFBFC", fontSize: 12.5 }}>
+                  <b>{m.user_name}</b> <span style={{ color: C.sub }}>{m.email}</span> <Tag text={m.role || "담당자"} color={C.teal} />
+                  <button onClick={() => removeMember(g.id, m.user_id)} style={{ border: "none", background: "none", cursor: "pointer", color: C.red }}><X size={12} /></button>
+                </div>
+              ))}
+            </div>}
+            <div style={{ display: "flex", gap: 6 }}>
+              <select value={addMemberId} onChange={(e) => setAddMemberId(e.target.value)} style={{ ...inp, minWidth: 200, padding: "5px 8px", fontSize: 12 }}>
+                <option value="">담당자 선택</option>
+                {users.filter((u) => !(g.members || []).some((m) => m.user_id === u.id)).map((u) => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
+              </select>
+              <Btn kind="default" sm disabled={!addMemberId} onClick={() => addMember(g.id)}><UserPlus size={12} /> 추가</Btn>
+            </div>
+          </div>
+
+          {/* 과제 */}
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>연결된 과제</div>
+            {(g.projects || []).length > 0 && <TableWrap>
+              <thead><tr>{["과제번호", "기업명", "과제명", "상태", ""].map((h) => <th key={h} style={th()}>{h}</th>)}</tr></thead>
+              <tbody>
+                {g.projects.map((p) => (
+                  <tr key={p.id}>
+                    <td style={{ ...td(), ...numCell, color: C.sub }}>{p.id}</td>
+                    <td style={{ ...td(), fontWeight: 700 }}>{p.name}</td>
+                    <td style={td()}>{p.task}</td>
+                    <td style={td()}><Status s={p.status} /></td>
+                    <td style={td()}><Btn kind="danger" sm onClick={() => removeProject(g.id, p.id)}><X size={11} /></Btn></td>
+                  </tr>
+                ))}
+              </tbody>
+            </TableWrap>}
+            <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+              <select value={addProjectId} onChange={(e) => setAddProjectId(e.target.value)} style={{ ...inp, minWidth: 250, padding: "5px 8px", fontSize: 12 }}>
+                <option value="">과제 선택</option>
+                {unassignedProjects.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.id})</option>)}
+              </select>
+              <Btn kind="default" sm disabled={!addProjectId} onClick={() => addProject(g.id)}><FilePlus size={12} /> 연결</Btn>
+            </div>
+          </div>
+        </>}
+      </Panel>
+    ))}
+
+    {groups.length === 0 && <Panel title="기업그룹 없음"><div style={{ textAlign: "center", color: C.sub, padding: "16px 0" }}>등록된 기업그룹이 없습니다. 위에서 생성하세요.</div></Panel>}
+    {toast && <Toast text={toast} />}
   </>;
 }
 

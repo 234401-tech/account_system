@@ -43,7 +43,7 @@ function ChangePasswordModal({ onClose }) {
   </div>;
 }
 
-function Topbar() {
+function Topbar({ myProjects = [], selectedProject, onSelectProject }) {
   const { user, logout } = useAuth();
   const [showNotif, setShowNotif] = useState(false);
   const [showPwModal, setShowPwModal] = useState(false);
@@ -74,6 +74,12 @@ function Topbar() {
         <div style={{ padding: "5px 12px", borderRadius: 4, fontSize: 11.5, fontWeight: 700, background: user.role === "master" || user.role === "admin" ? C.blue + "33" : user.role === "auditor" ? C.amber + "33" : C.teal + "33", color: user.role === "master" || user.role === "admin" ? "#B0C4FF" : user.role === "auditor" ? "#E0C080" : "#7EDCC8" }}>
           {user.role === "master" ? "마스터 관리자" : user.role === "admin" ? "기관관리자" : user.role === "auditor" ? "회계사" : "기업 포털"}
         </div>
+        {user.role === "company" && myProjects.length > 1 && (
+          <select value={selectedProject || ""} onChange={(e) => onSelectProject(e.target.value)}
+            style={{ background: "#2A3845", border: "1px solid #3A4A5A", borderRadius: 4, padding: "4px 10px", color: "#fff", fontSize: 12, fontWeight: 600 }}>
+            {myProjects.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.id})</option>)}
+          </select>
+        )}
         {/* 알림 벨 */}
         <div ref={ref} style={{ position: "relative" }}>
           <div onClick={() => setShowNotif(!showNotif)} style={{ cursor: "pointer", position: "relative" }}>
@@ -129,15 +135,29 @@ function Topbar() {
 function Layout() {
   const { user, loading: authLoading } = useAuth();
   const { companies, loading: appLoading } = useApp();
+  const [myProjects, setMyProjects] = useState([]);
+  const [selectedProject, setSelectedProject] = useState(null);
+
+  useEffect(() => {
+    if (user?.role === "company") {
+      api.getMyProjects().then((ps) => {
+        setMyProjects(ps);
+        if (ps.length > 0 && !selectedProject) setSelectedProject(ps[0].id);
+      }).catch(() => {});
+    }
+  }, [user]);
+
   if (authLoading || appLoading) return <div style={{ padding: 40, color: C.sub, fontFamily: "Pretendard, sans-serif" }}>불러오는 중…</div>;
 
   if (!user) return <LoginPage />;
 
-  const companyId = user.role === "company" ? user.companyId : (companies[0]?.id || null);
+  const companyId = user.role === "company"
+    ? (myProjects.length > 1 ? (selectedProject || myProjects[0]?.id) : user.companyId || myProjects[0]?.id)
+    : (companies[0]?.id || null);
 
   return (
     <div style={{ color: C.text, minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column" }}>
-      <Topbar />
+      <Topbar myProjects={myProjects} selectedProject={selectedProject} onSelectProject={setSelectedProject} />
       <div style={{ flex: 1, display: "flex" }}>
         {(user.role === "admin" || user.role === "master")
           ? <AdminApp />

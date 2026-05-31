@@ -2,11 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "production",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["server/index.js"],
-      "port": 8090,
-      "autoPort": false
+      "name": "dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--port", "5173"],
+      "port": 5173
     }
   ]
 }

@@ -50,6 +50,17 @@ export const decideAmendment = (id, decision, comment) =>
 export const attachAmendmentFile = (amendId, file) => http_upload(`/api/ledger/amendments/${amendId}/attachments`, file);
 export const getAmendmentTimeline = (companyId) => http_get(`/api/amendments/timeline/${companyId}`);
 
+// --- 기업그룹 ---
+export const listGroups = () => http_get("/api/groups");
+export const createGroup = (data) => http_post("/api/groups", data);
+export const updateGroup = (id, data) => http_put(`/api/groups/${id}`, data);
+export const deleteGroup = (id) => http_del(`/api/groups/${id}`);
+export const addGroupMember = (groupId, userId, role) => http_post(`/api/groups/${groupId}/members`, { userId, role });
+export const removeGroupMember = (groupId, userId) => http_del(`/api/groups/${groupId}/members/${userId}`);
+export const addGroupProject = (groupId, projectId) => http_post(`/api/groups/${groupId}/projects`, { projectId });
+export const removeGroupProject = (groupId, projectId) => http_del(`/api/groups/${groupId}/projects/${projectId}`);
+export const getMyProjects = () => http_get("/api/groups/my-projects");
+
 // --- 알림 ---
 export const listNotifications = () => http_get("/api/notifications");
 export const markNotificationRead = (id) => http_post(`/api/notifications/read/${id}`, {});

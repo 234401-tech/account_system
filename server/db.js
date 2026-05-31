@@ -46,7 +46,9 @@ db.exec(`
     budget        TEXT NOT NULL DEFAULT '{}',
     exec_amt      TEXT NOT NULL DEFAULT '{}',
     invite_email  TEXT,
-    created_at    TEXT DEFAULT (datetime('now'))
+    group_id      TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (group_id) REFERENCES company_groups(id)
   );
 
   CREATE TABLE IF NOT EXISTS researchers (
@@ -122,6 +124,23 @@ db.exec(`
     size          INTEGER,
     uploaded_at   TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (amendment_id) REFERENCES amendments(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS company_groups (
+    id            TEXT PRIMARY KEY,
+    name          TEXT NOT NULL,
+    biz_no        TEXT,
+    created_at    TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS group_members (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id      TEXT NOT NULL,
+    user_id       TEXT NOT NULL,
+    role          TEXT DEFAULT '담당자',
+    UNIQUE(group_id, user_id),
+    FOREIGN KEY (group_id) REFERENCES company_groups(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
   );
 
   CREATE TABLE IF NOT EXISTS auditor_assignments (
