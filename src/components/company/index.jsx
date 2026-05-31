@@ -1037,10 +1037,13 @@ export function AccountRegister({ registered, onRegistered }) {
 }
 
 export function InitialRegistration({ co, onDone }) {
-  const [people, setPeople] = useState([{ id: "R1", name: co.pm || "", role: "연구책임자", position: "책임연구원", rate: 30, period: co.period, salary: true }]);
+  const initPeople = [{ id: "R1", name: co.pm || "", role: "연구책임자", position: "책임연구원", rate: 30, period: co.period, salary: true }];
+  const [people, setPeople] = useState(initPeople);
   const [acct, setAcct] = useState(false);
   const setP = (i, k, v) => setPeople(people.map((p, idx) => idx === i ? { ...p, [k]: v } : p));
   const addP = () => setPeople([...people, { id: "R" + (people.length + 1), name: "", role: "참여연구원", position: "연구원", rate: 0, period: co.period, salary: true }]);
+  const delP = (i) => setPeople(people.filter((_, idx) => idx !== i));
+  const resetAll = () => { setPeople(initPeople); setAcct(false); };
   const valid = people.some((p) => p.name) && acct;
 
   const steps = [
@@ -1048,7 +1051,7 @@ export function InitialRegistration({ co, onDone }) {
     { t: "사업비 통장(계좌) 등록", done: acct },
   ];
   return <>
-    <Panel title="초기 등록" sub="발급된 과제의 집행을 시작하기 위한 등록 절차입니다">
+    <Panel title="초기 등록" sub="발급된 과제의 집행을 시작하기 위한 등록 절차입니다" extra={<Btn kind="danger" sm onClick={resetAll}><RotateCw size={12} /> 전체 초기화</Btn>}>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
         {steps.map((s, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", border: `1px solid ${s.done ? C.green + "55" : C.line}`, borderRadius: 4, background: s.done ? C.greenLt : "#fff", flex: 1, minWidth: 180 }}>
@@ -1066,7 +1069,7 @@ export function InitialRegistration({ co, onDone }) {
         <Btn kind="default" sm onClick={addP}><UserPlus size={13} /> 연구원 추가</Btn>
       </div>}>
       <TableWrap>
-        <thead><tr>{["성명", "역할", "직급", "참여율(%)", "인건비", "참여기간"].map((h, i) => <th key={h} style={th(i === 3 ? "right" : "left")}>{h}</th>)}</tr></thead>
+        <thead><tr>{["성명", "역할", "직급", "참여율(%)", "인건비", "참여기간", ""].map((h, i) => <th key={h} style={th(i === 3 ? "right" : "left")}>{h}</th>)}</tr></thead>
         <tbody>
           {people.map((p, i) => <tr key={p.id}>
             <td style={td()}><input value={p.name} onChange={(e) => setP(i, "name", e.target.value)} placeholder="성명" style={{ ...inp, width: 90 }} /></td>
@@ -1075,12 +1078,14 @@ export function InitialRegistration({ co, onDone }) {
             <td style={td("right")}><input value={p.rate} onChange={(e) => setP(i, "rate", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} style={{ ...inp, width: 60, textAlign: "right", ...numCell }} /></td>
             <td style={td()}><select value={p.salary ? "현금" : "현물"} onChange={(e) => setP(i, "salary", e.target.value === "현금")} style={{ ...inp, padding: "4px 6px" }}><option>현금</option><option>현물</option></select></td>
             <td style={td()}><input value={p.period} onChange={(e) => setP(i, "period", e.target.value)} placeholder="2026-02-01 ~ 2026-11-30" style={{ ...inp, width: 170 }} /></td>
+            <td style={td()}>{people.length > 1 && <Btn kind="danger" sm onClick={() => delP(i)}><Trash2 size={11} /></Btn>}</td>
           </tr>)}
         </tbody>
       </TableWrap>
     </Panel>
 
-    <Panel title="② 사업비 계좌 등록" sub="통장사본 업로드 시 계좌정보 자동 인식(OCR)">
+    <Panel title="② 사업비 계좌 등록" sub="통장사본 업로드 시 계좌정보 자동 인식(OCR)"
+      extra={acct && <Btn kind="default" sm onClick={() => setAcct(false)}><RotateCw size={12} /> 재등록</Btn>}>
       <AccountRegister registered={acct} onRegistered={() => setAcct(true)} />
     </Panel>
 
