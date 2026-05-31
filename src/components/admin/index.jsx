@@ -923,11 +923,24 @@ export function UserAdmin() {
                 <td style={{ ...td(), fontWeight: 700 }}>{u.name}</td>
                 <td style={{ ...td(), color: C.sub }}>{u.email}</td>
                 <td style={td()}>{u.role === "master" ? <Tag text="마스터 관리자" color={C.red} /> :
-                  <select value={u.role} onChange={async (e) => { await api.updateUser(u.id, { role: e.target.value }); setToast(`${u.name} 역할이 변경되었습니다.`); loadUsers(); }} style={{ ...inp, padding: "3px 8px", fontSize: 12, fontWeight: 700, color: roleColor[u.role], borderColor: roleColor[u.role] }}>
+                  <select value={u.role} onChange={async (e) => {
+                      const newRole = e.target.value;
+                      setUsers(prev => prev.map(x => x.id === u.id ? { ...x, role: newRole } : x));
+                      await api.updateUser(u.id, { role: newRole });
+                      setToast(`${u.name} 역할이 변경되었습니다.`);
+                      await loadUsers();
+                    }} style={{ ...inp, padding: "3px 8px", fontSize: 12, fontWeight: 700, color: roleColor[u.role], borderColor: roleColor[u.role] }}>
                     <option value="company">기업</option><option value="admin">기관관리자</option><option value="auditor">회계사</option>
                   </select>}</td>
                 <td style={td()}>{u.role === "company"
-                  ? <select value={u.company_id || ""} onChange={async (e) => { await api.updateUser(u.id, { companyId: e.target.value || null }); setToast(`${u.name} 과제가 연결되었습니다.`); loadUsers(); }} style={{ ...inp, padding: "3px 6px", fontSize: 11, minWidth: 120 }}>
+                  ? <select value={u.company_id || ""} onChange={async (e) => {
+                      const newVal = e.target.value || null;
+                      // 로컬 상태 즉시 업데이트
+                      setUsers(prev => prev.map(x => x.id === u.id ? { ...x, company_id: newVal } : x));
+                      await api.updateUser(u.id, { companyId: newVal });
+                      setToast(`${u.name} 과제가 연결되었습니다.`);
+                      await loadUsers();
+                    }} style={{ ...inp, padding: "3px 6px", fontSize: 11, minWidth: 120 }}>
                     <option value="">미연결</option>
                     {companies.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.id})</option>)}
                   </select>
