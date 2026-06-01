@@ -49,8 +49,9 @@ if (existsSync(distPath)) {
   console.log("  프론트엔드: dist/ 정적 서빙 활성화");
 }
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`\n  정산 모니터링 API 서버`);
   console.log(`  http://localhost:${PORT}`);
+  console.log(`  내부망 접속: http://<이 PC의 IP>:${PORT}`);
   console.log(`  헬스체크: http://localhost:${PORT}/api/health\n`);
 });
